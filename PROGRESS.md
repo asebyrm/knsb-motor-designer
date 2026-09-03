@@ -6,59 +6,47 @@ To resume: `git log --oneline -20`, `git status`, then
 
 ## Current phase
 
-Phases 1-3 **COMPLETE** (tags v0.1-core, v0.2-analysis, v0.3-export).
-Starting Phase 4 (FastAPI + DB + auth + admin + ProcessPool/job polling).
+Phases 1-6 **COMPLETE**. 131 backend tests green (128 fast + 3 slow), ruff clean,
+`frontend` builds (`tsc -b && vite build`), oxlint clean. Starting Phase 8
+(Docker, Caddy, docs, CI, README, GitHub publish). Phase 7 admin panel done inline.
 
-## Phase 1 — physics core (done)
+## Phases 1-4 (backend) — done
 
-- `core/units.py`, `core/warnings.py` (46-code catalogue), `core/propellant.py`
-  (piecewise Saint-Robert + self-consistent equilibrium solver / Brent fallback).
-- `core/grains/` — `base` (ABC + `@register_grain`), `bates` (+ neutral-length solver),
-  `tubular`, `endburner`.
-- `core/nozzle.py` — real Cf via area-Mach solve, Summerfield separation, optional erosion.
-- `core/sampling.py` — RDP shape-preserving downsample (500-pt API / 32-pt .eng).
-- `core/ballistics.py` — quasi-steady march, dt-convergence, ignition transient, tail-off,
-  MEOP on the erosionless curve, NAR designation.
-- `core/examples.py`, `core/cli.py`, `data/propellants/knsb.yaml`.
+core physics + analysis + export + FastAPI. Tags v0.1-core .. v0.4-api.
+Run API: `cd backend && ENVIRONMENT=development ../.venv/bin/uvicorn api.main:app --reload`
 
-## Phase 2 — analysis layer (done)
+## Phase 5-6 (frontend) — done
 
-- `core/materials.py` + `data/materials/case_materials.yaml` (7) + `liner_materials.yaml` (5).
-- `core/assembly.py` — compute_layout, total_length/mass, CG(web), free_volume(web),
-  characteristic_length, validate_fit, bill_of_materials (+ `bom_total_mass`).
-- `core/structure.py` — thin/thick-wall hoop stress + Von Mises, FoS gate (min 2.0),
-  print-method knock-down, shear-bolt sizing.
-- `core/thermal.py` — mandatory liner, semi-infinite soak, ablation burn-through.
-- `core/flight.py` — ISA atmosphere, 1-DOF RK4, rail-exit / apogee / max-g.
-- `core/solver.py` — mission solver (`solve_mission`, ProcessPool-safe), 3-candidate output,
-  constraint-relaxation suggestion. `core/cli.py mission` subcommand.
-
-## Tests passing (82 = 80 fast + 2 @slow)
-
-- P1: test_propellant 12, test_grains 9, test_nozzle 9, test_ballistics 12,
-  test_reference_case 10 (**13.1: peak 21.99 bar, WARN_MEOP_EXCEEDED**).
-- P2: test_assembly 9, test_structure 5, test_thermal 5, test_flight 8,
-  test_solver 2 @slow (**13.2 infeasible mission → binding constraint + numeric fix**).
-
-## Phase 3 — export (done)
-
-- `core/export/{eng,rse,tabular,drawing,report}.py`, `core/branding.py`, `core/i18n.py`.
-- `services/{design,simulation,export}_service.py`. `mission_service.py` still TODO (Phase 4,
-  wraps `core.solver.solve_mission` in a ProcessPool + job store).
-- `data/propellants/kndx.yaml`.
-- Tests: test_export (11), test_services (4), test_extensibility (3). 99 total (97 fast + 2 slow).
+- Vite + React 18 + TS + Tailwind(3) + Zustand + TanStack Query + react-i18next + Recharts.
+- `frontend/src/`: `i18n.ts`, `api.ts`, `store.ts`, `types.ts`,
+  `lib/{registry,units,examples}.ts`,
+  `components/{ui,ParamPanel,Charts,GrainCrossSection,EngineCrossSection,ResultsPanel,
+  MissionPanel,Topbar,Logo,AuthDialog,ExportDialog}.tsx`,
+  `pages/{Designer,Admin}.tsx`, `App.tsx`, `main.tsx`.
+- 3-column layout, Basic/Expert, unit + theme + TR/EN toggles, examples menu,
+  first-run disclaimer, contextual `?` tooltips (hover 400 ms / focus / tap),
+  grain cross-section + web slider, Section 10.1 engine cross-section (scaled SVG,
+  dimension lines + editable dimension table, derived italic, red on bad fit,
+  SVG + BOM CSV download), mission panel (job poll, 3 candidates, ±band, scope note,
+  infeasible → binding constraint + apply-suggestion), export dialog (423 lock + accept-risk).
+- `backend/api/routes/tools.py` (neutral-length, optimum-expansion helpers).
+- `locales/{en,tr}.json` canonical; `scripts/gen_glossary.py` → `docs/glossary_tr_en.md`.
+- `tests/test_i18n_coverage.py` (11): every param/metric/derived/action/warning has tr+en,
+  key sets identical (acceptance 4b, 7).
 
 ## Next step
 
-Phase 4 — `backend/api/` FastAPI app, `backend/models/` SQLAlchemy + Alembic, JWT auth
-(Argon2id), admin endpoints, OpenAPI. `services/mission_service.py` +
-`services/infra.py` (RateLimiter, JobStore abstract + in-memory impls) +
-`ProcessPoolExecutor` wiring per Section 12.2. `tests/load/` concurrency test.
-Config via pydantic-settings reading os.environ (fail loudly if secrets missing).
+Phase 8:
+- `docker-compose.yml` (api, web/nginx, db postgres:16, caddy) + `monitoring` profile
+  (prometheus + grafana, default off).
+- `backend/Dockerfile`, `frontend/Dockerfile`, `Caddyfile`, `Makefile`.
+- `docs/DEPLOYMENT.md`, `docs/VALIDATION.md` (openMotor + Nakka compare), `docs/PHYSICS.md`.
+- `README.md` (already drafted) + `README.tr.md`, `CONTRIBUTING.md`, `CHANGELOG.md`,
+  `.github/workflows/ci.yml`.
+- `scripts/{cleanup_exports.sh,backup_db.sh}`.
+- GitHub publish per Section 12.1 (needs `gh auth login` by the user; secret-scan first).
 
 ## Last files touched
 
-- `backend/core/export/*`, `backend/core/{branding,i18n}.py`
-- `backend/services/{design,simulation,export}_service.py`
-- `backend/data/propellants/kndx.yaml`
-- `backend/tests/test_{export,services,extensibility}.py`
+- entire `frontend/`, `locales/*.json`, `backend/api/routes/tools.py`,
+  `backend/tests/test_i18n_coverage.py`, `scripts/gen_glossary.py`, `docs/glossary_tr_en.md`

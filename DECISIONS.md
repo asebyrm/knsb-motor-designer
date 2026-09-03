@@ -57,3 +57,34 @@ Reviewed once at the end of the project.
 - **BOM TOTAL row** = sum of the *rounded* per-part masses (not `round(total)`), so the table is
   self-consistent to the last digit and `.eng`/`.rse` take their header mass from
   `assembly.bom_total_mass()` verbatim (acceptance criterion 11).
+
+## API (Phase 4)
+
+- **First registered user becomes admin** (no separate bootstrap step; `docs/DEPLOYMENT.md`
+  says register first).
+- **Ephemeral dev JWT secret** is generated once per process (`lru_cache`) so tokens verify
+  within a run; production still hard-fails without `SECRET_KEY`.
+- **`:memory:` SQLite** uses `StaticPool` so the lifespan `create_all()` and request sessions
+  share one connection (tests + quick local runs).
+- **Single `/api/export` route**, format in the body; danger warnings → HTTP 423 unless
+  `accept_risk=true`. Non-safety formats (csv/json/svg/pdf) are never locked.
+- **Rate limit** reads the live value from settings each call (so tests can relax the sim/
+  mission buckets while still exercising the login bucket).
+
+## Frontend (Phase 5-7)
+
+- **shadcn/ui not used via its CLI** (needs interactive init); hand-rolled Tailwind primitives
+  in `components/ui.tsx` (Card, Accordion, Tabs, Dialog, Info tooltip, LevelDot) give the same
+  clean system without the dependency. Recharts for the curve panel.
+- **Canonical locale files** live at `<repo>/locales/{tr,en}.json`; the frontend imports them
+  via the `@locales` Vite alias and the backend PDF/i18n reads the same files. One source, no
+  drift; `docs/glossary_tr_en.md` is generated from them by `scripts/gen_glossary.py`.
+- **`lib/registry.ts`** is the single source of truth for parameter / metric / derived /
+  action IDs — it drives the form, the editable drawing labels and the i18n-coverage test.
+- **Engine cross-section (Section 10.1)**: scaled SVG from `assembly.parts` (same backend
+  layout as `.eng`), headline dimension lines on the drawing plus an editable dimension table
+  (input dims → click-to-edit → re-sim; derived dims italic + `?` explaining the source);
+  out-of-fit parts stroked red from `assembly.fit_warnings`; layer toggles; SVG + BOM-CSV
+  download. Full interactive on-canvas label editing for every dimension is approximated by
+  the table for v1.
+- **Apogee band** shown as `~X m (low–high, ±18%)`, never a bare number.

@@ -19,7 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routes import admin, auth, designs, export, health, mission, simulate
+from api.routes import admin, auth, designs, export, health, mission, simulate, tools
 from app_config import get_settings
 from models.base import create_all
 from services.executors import shutdown_pools, start_pools
@@ -88,7 +88,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content={"detail": "internal error"})
 
     api = FastAPI(title=f"{settings.app_name} API")
-    for module in (health, auth, designs, simulate, mission, export, admin):
+    for module in (health, auth, designs, simulate, mission, export, admin, tools):
         api.include_router(module.router)
     api.include_router(designs.public_router)
     app.mount("/api", api)
