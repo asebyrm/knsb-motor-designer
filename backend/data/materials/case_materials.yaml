@@ -1,0 +1,113 @@
+# Chamber (case) materials. All SI. Adding a material = one entry here, no code change.
+#
+# tensile_strength        : ultimate tensile strength [Pa]
+# yield_strength          : tensile yield [Pa] (falls back to 0.9 * tensile if omitted)
+# print_direction_factor  : knock-down for load normal to the print layers.
+#                           Overridden at analysis time by the chosen print method
+#                           (FDM 0.5, SLS 0.9) for thermoplastics; 1.0 for wrought metal.
+# elastic_modulus         : Young's modulus [Pa]
+# density                 : [kg/m^3]
+# thermal_conductivity    : k [W/(m*K)]
+# specific_heat           : c_p [J/(kg*K)]
+# glass_transition        : T_g [K] (melting point for metals)
+# max_service_temp        : continuous-use limit [K]
+# notes_key               : i18n key for the caveat text shown in the UI
+
+materials:
+  - id: pla
+    name_en: "PLA (FDM)"
+    name_tr: "PLA (FDM)"
+    tensile_strength: 50.0e6
+    yield_strength: 45.0e6
+    print_direction_factor: 0.5
+    elastic_modulus: 3.5e9
+    density: 1240
+    thermal_conductivity: 0.13
+    specific_heat: 1800
+    glass_transition: 333
+    max_service_temp: 318
+    notes_key: "material.pla.notes"
+
+  - id: petg
+    name_en: "PETG (FDM)"
+    name_tr: "PETG (FDM)"
+    tensile_strength: 50.0e6
+    yield_strength: 47.0e6
+    print_direction_factor: 0.5
+    elastic_modulus: 2.1e9
+    density: 1270
+    thermal_conductivity: 0.29
+    specific_heat: 1200
+    glass_transition: 358
+    max_service_temp: 343
+    notes_key: "material.petg.notes"
+
+  - id: abs
+    name_en: "ABS (FDM)"
+    name_tr: "ABS (FDM)"
+    tensile_strength: 40.0e6
+    yield_strength: 37.0e6
+    print_direction_factor: 0.5
+    elastic_modulus: 2.0e9
+    density: 1040
+    thermal_conductivity: 0.17
+    specific_heat: 1400
+    glass_transition: 378
+    max_service_temp: 358
+    notes_key: "material.abs.notes"
+
+  - id: pa12
+    name_en: "PA12 (Nylon 12, SLS)"
+    name_tr: "PA12 (Naylon 12, SLS)"
+    tensile_strength: 48.0e6
+    yield_strength: 44.0e6
+    print_direction_factor: 0.9
+    elastic_modulus: 1.65e9
+    density: 1010
+    thermal_conductivity: 0.24
+    specific_heat: 1800
+    glass_transition: 448
+    max_service_temp: 353
+    notes_key: "material.pa12.notes"
+
+  - id: pa6_cf
+    name_en: "PA6-CF (carbon-filled nylon, FDM)"
+    name_tr: "PA6-CF (karbon takviyeli naylon, FDM)"
+    tensile_strength: 130.0e6
+    yield_strength: 90.0e6
+    print_direction_factor: 0.45
+    elastic_modulus: 8.0e9
+    density: 1150
+    thermal_conductivity: 0.35
+    specific_heat: 1500
+    glass_transition: 453
+    max_service_temp: 393
+    notes_key: "material.pa6_cf.notes"
+
+  - id: pc
+    name_en: "Polycarbonate (FDM)"
+    name_tr: "Polikarbonat (FDM)"
+    tensile_strength: 65.0e6
+    yield_strength: 60.0e6
+    print_direction_factor: 0.5
+    elastic_modulus: 2.3e9
+    density: 1200
+    thermal_conductivity: 0.20
+    specific_heat: 1200
+    glass_transition: 420
+    max_service_temp: 393
+    notes_key: "material.pc.notes"
+
+  - id: al6061_t6
+    name_en: "Aluminium 6061-T6 (reference, machined)"
+    name_tr: "Alüminyum 6061-T6 (referans, talaşlı)"
+    tensile_strength: 310.0e6
+    yield_strength: 276.0e6
+    print_direction_factor: 1.0
+    elastic_modulus: 68.9e9
+    density: 2700
+    thermal_conductivity: 167
+    specific_heat: 896
+    glass_transition: 925
+    max_service_temp: 450
+    notes_key: "material.al6061_t6.notes"

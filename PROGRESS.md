@@ -1,43 +1,53 @@
 # Progress Log
 
 Recovery point for a resumed session. Updated every commit.
-To resume: run `git log --oneline -20`, `git status`, then `cd backend && ../.venv/bin/python -m pytest -q`
-before trusting this file.
+To resume: `git log --oneline -20`, `git status`, then
+`cd backend && ../.venv/bin/python -m pytest -q -m "not slow"` before trusting this file.
 
 ## Current phase
 
-Phase 1 — Physics core: **COMPLETE**. Starting Phase 2 (analysis layer).
+Phases 1 & 2 **COMPLETE**. Starting Phase 3 (export: .eng, .rse, CSV, JSON, PDF).
 
-## Modules done
+## Phase 1 — physics core (done)
 
-- Scaffold, `.gitignore`, `pyproject.toml`, AGPL-3.0 `LICENSE`, `DECISIONS.md`.
-- `.venv` Python 3.11.15.
-- `core/units.py` — SI constants + I/O conversions.
-- `core/warnings.py` — coded diagnostics, `ALL_WARNING_CODES` catalogue (46 codes).
-- `core/propellant.py` — piecewise Saint-Robert, self-consistent equilibrium solver + Brent fallback.
-- `core/grains/` — `base` (ABC + registry), `bates` (+ neutral-length solver), `tubular`, `endburner`.
-- `core/nozzle.py` — real Cf, area-Mach exit solve, Summerfield separation, throat erosion (off by default).
-- `core/sampling.py` — shape-preserving RDP downsample (used for 500-pt API + 32-pt .eng).
-- `core/ballistics.py` — quasi-steady time march, dt convergence, ignition transient, tail-off,
-  MEOP on erosionless curve, NAR designation.
-- `core/examples.py` — reference case + 3 sample motors.
-- `core/cli.py` — `python -m core.cli example reference | simulate ...`.
-- `data/propellants/knsb.yaml`.
+- `core/units.py`, `core/warnings.py` (46-code catalogue), `core/propellant.py`
+  (piecewise Saint-Robert + self-consistent equilibrium solver / Brent fallback).
+- `core/grains/` — `base` (ABC + `@register_grain`), `bates` (+ neutral-length solver),
+  `tubular`, `endburner`.
+- `core/nozzle.py` — real Cf via area-Mach solve, Summerfield separation, optional erosion.
+- `core/sampling.py` — RDP shape-preserving downsample (500-pt API / 32-pt .eng).
+- `core/ballistics.py` — quasi-steady march, dt-convergence, ignition transient, tail-off,
+  MEOP on the erosionless curve, NAR designation.
+- `core/examples.py`, `core/cli.py`, `data/propellants/knsb.yaml`.
 
-## Tests passing (54)
+## Phase 2 — analysis layer (done)
 
-- `test_propellant.py` (12) — unit-conversion trap, negative-n band solver.
-- `test_grains.py` (9) — BATES neutrality < 2%, volume/area identity.
-- `test_nozzle.py` (9) — Cf, eps solve, separation, erosion.
-- `test_ballistics.py` (12) — mass conservation, dt convergence, downsample impulse < 1%, NAR.
-- `test_reference_case.py` (10) — **Section 13.1: peak 21.99 bar, WARN_MEOP_EXCEEDED fires.**
+- `core/materials.py` + `data/materials/case_materials.yaml` (7) + `liner_materials.yaml` (5).
+- `core/assembly.py` — compute_layout, total_length/mass, CG(web), free_volume(web),
+  characteristic_length, validate_fit, bill_of_materials (+ `bom_total_mass`).
+- `core/structure.py` — thin/thick-wall hoop stress + Von Mises, FoS gate (min 2.0),
+  print-method knock-down, shear-bolt sizing.
+- `core/thermal.py` — mandatory liner, semi-infinite soak, ablation burn-through.
+- `core/flight.py` — ISA atmosphere, 1-DOF RK4, rail-exit / apogee / max-g.
+- `core/solver.py` — mission solver (`solve_mission`, ProcessPool-safe), 3-candidate output,
+  constraint-relaxation suggestion. `core/cli.py mission` subcommand.
+
+## Tests passing (82 = 80 fast + 2 @slow)
+
+- P1: test_propellant 12, test_grains 9, test_nozzle 9, test_ballistics 12,
+  test_reference_case 10 (**13.1: peak 21.99 bar, WARN_MEOP_EXCEEDED**).
+- P2: test_assembly 9, test_structure 5, test_thermal 5, test_flight 8,
+  test_solver 2 @slow (**13.2 infeasible mission → binding constraint + numeric fix**).
 
 ## Next step
 
-Phase 2: `core/assembly.py` (compute_layout, total_length/mass, CG, free_volume, validate_fit),
-then `structure.py`, `thermal.py`, `flight.py`, `solver.py`, and `data/materials/case_materials.yaml`
-+ `data/liners/`.
+Phase 3 — export writers (`core/export/` or `services/export_service.py`):
+`.eng` (RASP, ≤32 pts, impulse within 1%, ends at 0), `.rse` (RockSim XML, time-varying
+mass+CG), CSV (full-res), JSON (versioned design schema), PDF (ReportLab). Round-trip +
+downsampling tests. Then `services/{design,simulation,mission}_service.py`.
 
 ## Last files touched
 
-- all of `backend/core/`, `backend/tests/`, `backend/data/propellants/knsb.yaml`
+- `backend/core/{materials,assembly,structure,thermal,flight,solver,cli}.py`
+- `backend/data/materials/*.yaml`
+- `backend/tests/test_{assembly,structure,thermal,flight,solver}.py`

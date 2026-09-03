@@ -1,0 +1,63 @@
+# Ablative / thermal liner materials (Section 5.7). All SI.
+#
+# ablation_rate    : approximate surface recession [m/s] at KNSB flame conditions
+# min_thickness    : recommended minimum liner thickness [m]
+# thermal_conductivity, density, specific_heat : for the semi-infinite-solid soak estimate
+# max_interface_temp : temperature the OUTER liner face should not exceed [K]
+# notes_key        : i18n key
+
+liners:
+  - id: kraft_phenolic
+    name_en: "Kraft paper / phenolic"
+    name_tr: "Kraft kağıt / fenolik"
+    ablation_rate: 1.5e-4
+    min_thickness: 1.5e-3
+    thermal_conductivity: 0.25
+    density: 1300
+    specific_heat: 1600
+    max_interface_temp: 500
+    notes_key: "liner.kraft_phenolic.notes"
+
+  - id: cardboard
+    name_en: "Spiral-wound cardboard"
+    name_tr: "Spiral sarım karton"
+    ablation_rate: 3.0e-4
+    min_thickness: 2.0e-3
+    thermal_conductivity: 0.06
+    density: 700
+    specific_heat: 1400
+    max_interface_temp: 450
+    notes_key: "liner.cardboard.notes"
+
+  - id: graphite
+    name_en: "Graphite sleeve"
+    name_tr: "Grafit kovan"
+    ablation_rate: 2.0e-5
+    min_thickness: 2.0e-3
+    thermal_conductivity: 85
+    density: 1800
+    specific_heat: 710
+    max_interface_temp: 900
+    notes_key: "liner.graphite.notes"
+
+  - id: ceramic_blanket
+    name_en: "Ceramic-fibre blanket"
+    name_tr: "Seramik elyaf battaniye"
+    ablation_rate: 1.0e-5
+    min_thickness: 3.0e-3
+    thermal_conductivity: 0.10
+    density: 128
+    specific_heat: 1130
+    max_interface_temp: 1200
+    notes_key: "liner.ceramic_blanket.notes"
+
+  - id: sand_epoxy
+    name_en: "Sand-filled epoxy"
+    name_tr: "Kum-epoksi"
+    ablation_rate: 1.2e-4
+    min_thickness: 2.5e-3
+    thermal_conductivity: 0.5
+    density: 1700
+    specific_heat: 1000
+    max_interface_temp: 500
+    notes_key: "liner.sand_epoxy.notes"

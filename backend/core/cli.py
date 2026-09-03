@@ -7,6 +7,8 @@
     python -m core.cli simulate --propellant knsb --grain bates \\
         --do 0.054 --core 0.020 --seg-len 0.09 --segments 3 \\
         --throat 0.0135 --eps 5 [--meop-bar 70]
+    python -m core.cli mission --dry-mass 6 --diameter 0.10 --apogee 900 \\
+        --case-id 0.075 --meop-bar 45 [--budget 20]
 
 No web or DB imports here - this must run from a bare checkout of ``core/``.
 """
@@ -90,6 +92,47 @@ def _cmd_simulate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_mission(args: argparse.Namespace) -> int:
+    from core.solver import MissionInput, solve_mission
+
+    cfg = MissionInput(
+        dry_mass=args.dry_mass,
+        body_diameter=args.diameter,
+        target_apogee=args.apogee,
+        drag_coefficient=args.cd,
+        rail_length=args.rail,
+        launch_altitude=args.altitude,
+        max_accel_g=args.max_g,
+        case_inner_diameter=args.case_id,
+        case_wall_thickness=args.case_wall,
+        case_material_id=args.case_material,
+        print_method=args.print_method,
+        meop_bar=args.meop_bar,
+        time_budget_s=args.budget,
+    )
+    res = solve_mission(cfg)
+    print(f"\n=== mission: {args.apogee:.0f} m target "
+          f"({'FEASIBLE' if res.feasible else 'INFEASIBLE'}, "
+          f"{res.iterations} evals, {res.elapsed_s}s) ===")
+    if res.feasible:
+        for i, c in enumerate(res.candidates, 1):
+            print(f"\n  candidate {i}: {c['designation']}  "
+                  f"apogee ~{c['apogee']:.0f} m ({c['apogee_low']:.0f}-{c['apogee_high']:.0f})")
+            print(f"    D_o {c['outer_diameter'] * 1e3:.1f} mm  "
+                  f"core {c['core_diameter'] * 1e3:.1f} mm  "
+                  f"L_s {c['segment_length'] * 1e3:.1f} mm  N {c['segment_count']}  "
+                  f"d_t {c['throat_diameter'] * 1e3:.1f} mm")
+            print(f"    peak {c['peak_pressure_bar']:.1f} bar  FoS {c['fos']:.2f}  "
+                  f"J_min {c['min_j']:.2f}  rail-exit {c['rail_exit_velocity']:.1f} m/s  "
+                  f"max {c['max_accel_g']:.1f} g")
+    else:
+        print(f"\n  binding constraint: {res.binding_constraint}")
+        print(f"  suggestion: {res.suggestion}")
+    print("\n  " + "1-DOF estimate: vertical flight, constant Cd, no wind. "
+          "Real apogee typically +/-15-25%. Verify in OpenRocket / RockSim.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="core.cli", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -124,6 +167,22 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--erosion", action="store_true")
     ps.add_argument("--erosion-k", type=float, default=0.05)
     ps.set_defaults(func=_cmd_simulate)
+
+    pm = sub.add_parser("mission", help="inverse design: find motors for a mission")
+    pm.add_argument("--dry-mass", type=float, required=True, help="rocket mass w/o propellant [kg]")
+    pm.add_argument("--diameter", type=float, required=True, help="body diameter [m]")
+    pm.add_argument("--apogee", type=float, required=True, help="target apogee [m]")
+    pm.add_argument("--cd", type=float, default=0.55)
+    pm.add_argument("--rail", type=float, default=2.0, help="rail length [m]")
+    pm.add_argument("--altitude", type=float, default=0.0, help="launch altitude [m ASL]")
+    pm.add_argument("--max-g", type=float, default=15.0)
+    pm.add_argument("--case-id", type=float, default=0.075, help="case inner diameter [m]")
+    pm.add_argument("--case-wall", type=float, default=0.004, help="case wall thickness [m]")
+    pm.add_argument("--case-material", default="pa12")
+    pm.add_argument("--print-method", default="sls", choices=["fdm", "sls", "machined"])
+    pm.add_argument("--meop-bar", type=float, default=40.0)
+    pm.add_argument("--budget", type=float, default=25.0, help="solver time budget [s]")
+    pm.set_defaults(func=_cmd_mission)
     return p
 
 

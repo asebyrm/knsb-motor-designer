@@ -60,3 +60,4 @@ ignore = ["B008", "E741"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = ["slow: CPU-heavy tests (mission solver, load)"]
