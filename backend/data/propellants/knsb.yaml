@@ -1,0 +1,18 @@
+id: knsb_fine
+name_tr: "KNSB (ince öğütülmüş oksitleyici)"
+name_en: "KNSB (fine-grind oxidizer)"
+composition: "KNO3 65% / Sorbitol 35%"
+density_ideal: 1841        # kg/m3
+density_factor: 0.95       # actual/ideal cast density (user-adjustable)
+c_star_ideal: 910.93       # m/s
+c_star_efficiency: 0.95    # eta_cstar (changes with calibration)
+gamma: 1.1251
+flame_temperature: 1600    # K
+molar_mass: 39.9           # g/mol
+# Piecewise Saint-Robert law: r_b = a * (p_c[MPa])^n  -> [mm/s]
+burn_rate_ranges:
+  - {p_min: 0.103, p_max: 0.807, a: 10.71,  n: 0.625}
+  - {p_min: 0.807, p_max: 1.50,  a: 8.763,  n: -0.314}
+  - {p_min: 1.50,  p_max: 3.79,  a: 7.852,  n: -0.013}
+  - {p_min: 3.79,  p_max: 7.03,  a: 3.907,  n: 0.535}
+  - {p_min: 7.03,  p_max: 10.67, a: 9.653,  n: 0.064}
