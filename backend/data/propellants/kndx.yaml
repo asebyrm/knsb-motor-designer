@@ -1,0 +1,18 @@
+id: kndx
+name_tr: "KNDX (potasyum nitrat - dekstroz)"
+name_en: "KNDX (potassium nitrate - dextrose)"
+composition: "KNO3 65% / Dextrose 35%"
+density_ideal: 1879        # kg/m3
+density_factor: 0.95
+c_star_ideal: 912.0        # m/s
+c_star_efficiency: 0.95
+gamma: 1.1308
+flame_temperature: 1710    # K
+molar_mass: 42.39          # g/mol
+# Nakka piecewise Saint-Robert law: r_b = a * (p_c[MPa])^n -> [mm/s]
+burn_rate_ranges:
+  - {p_min: 0.100, p_max: 0.779, a: 8.875, n:  0.619}
+  - {p_min: 0.779, p_max: 2.572, a: 7.553, n: -0.009}
+  - {p_min: 2.572, p_max: 5.930, a: 3.841, n:  0.688}
+  - {p_min: 5.930, p_max: 8.502, a: 17.20, n: -0.148}
+  - {p_min: 8.502, p_max: 11.20, a: 4.775, n:  0.442}
