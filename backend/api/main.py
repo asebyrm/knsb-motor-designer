@@ -98,12 +98,36 @@ def create_app() -> FastAPI:
     return app
 
 
+try:  # metrics objects are module-level so re-creating the app never re-registers them
+    from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+
+    _HTTP_REQS = Counter(
+        "knsb_http_requests_total", "HTTP requests", ["method", "path", "status"]
+    )
+    _HTTP_LATENCY = Histogram(
+        "knsb_http_request_seconds", "HTTP request latency", ["method", "path"]
+    )
+    _HAS_PROM = True
+except ImportError:  # pragma: no cover
+    _HAS_PROM = False
+
+
 def _maybe_prometheus(app: FastAPI) -> None:
-    try:
-        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-    except ImportError:  # pragma: no cover
+    if not _HAS_PROM:  # pragma: no cover
         return
+    import time as _t
+
     from fastapi import Response
+
+    @app.middleware("http")
+    async def instrument(request: Request, call_next):
+        start = _t.perf_counter()
+        response = await call_next(request)
+        route = request.scope.get("route")
+        path = getattr(route, "path", request.url.path)
+        _HTTP_REQS.labels(request.method, path, str(response.status_code)).inc()
+        _HTTP_LATENCY.labels(request.method, path).observe(_t.perf_counter() - start)
+        return response
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:

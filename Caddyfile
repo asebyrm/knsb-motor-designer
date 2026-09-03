@@ -1,0 +1,19 @@
+# Automatic HTTPS via Let's Encrypt. {$DOMAIN} and {$ACME_EMAIL} come from .env.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API and generated export files -> backend
+	@api path /api/* /outputs/* /metrics
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	# everything else -> static frontend (nginx serves the SPA build from disk)
+	handle {
+		reverse_proxy web:80
+	}
+}
