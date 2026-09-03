@@ -16,10 +16,10 @@ every code here must have a ``tr`` and ``en`` translation or CI fails.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 
-class Level(str, Enum):
+class Level(StrEnum):
     INFO = "info"
     WARNING = "warning"
     DANGER = "danger"

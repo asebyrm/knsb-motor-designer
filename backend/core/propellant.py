@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import yaml
@@ -60,7 +60,7 @@ class BurnRateRange:
         return self.a * (max(p_pa, 0.0) / 1e6) ** self.n / 1000.0
 
 
-class PressureSolveMethod(str, Enum):
+class PressureSolveMethod(StrEnum):
     PIECEWISE_CLOSED_FORM = "piecewise_closed_form"
     BRENT = "brent"
     FAILED = "failed"
@@ -185,8 +185,11 @@ class Propellant:
             pick = min(stable_hits or consistent, key=lambda t: t[1])
             idx, p = pick
             if self.is_extrapolated(p):
-                warns.append(make("WARN_EXTRAPOLATED_BURN_RATE", pressure_mpa=round(p / 1e6, 3)))
-            return EquilibriumSolution(p, PressureSolveMethod.PIECEWISE_CLOSED_FORM, idx, tuple(warns))
+                warns.append(make("WARN_EXTRAPOLATED_BURN_RATE",
+                                  pressure_mpa=round(p / 1e6, 3)))
+            return EquilibriumSolution(
+                p, PressureSolveMethod.PIECEWISE_CLOSED_FORM, idx, tuple(warns)
+            )
 
         # 2) Brent on the residual
         from scipy.optimize import brentq  # local import keeps import graph light
@@ -224,7 +227,7 @@ class Propellant:
     # --- loading --------------------------------------------------------
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Propellant":
+    def from_dict(cls, d: dict) -> Propellant:
         ranges = tuple(
             BurnRateRange(
                 p_min_mpa=float(r["p_min"]),
@@ -251,7 +254,7 @@ class Propellant:
         )
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "Propellant":
+    def from_yaml(cls, path: str | Path) -> Propellant:
         with open(path, encoding="utf-8") as fh:
             return cls.from_dict(yaml.safe_load(fh))
 
