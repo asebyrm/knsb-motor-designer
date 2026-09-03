@@ -37,7 +37,7 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
     burnt: true,
   });
 
-  const parts = result?.assembly.parts ?? [];
+  const parts = useMemo(() => result?.assembly.parts ?? [], [result]);
   const fitCodes = new Set((result?.assembly.fit_warnings ?? []).map((w) => w.code));
 
   const bounds = useMemo(() => {
