@@ -6,7 +6,8 @@ To resume: `git log --oneline -20`, `git status`, then
 
 ## Current phase
 
-Phases 1 & 2 **COMPLETE**. Starting Phase 3 (export: .eng, .rse, CSV, JSON, PDF).
+Phases 1-3 **COMPLETE** (tags v0.1-core, v0.2-analysis, v0.3-export).
+Starting Phase 4 (FastAPI + DB + auth + admin + ProcessPool/job polling).
 
 ## Phase 1 — physics core (done)
 
@@ -39,15 +40,25 @@ Phases 1 & 2 **COMPLETE**. Starting Phase 3 (export: .eng, .rse, CSV, JSON, PDF)
 - P2: test_assembly 9, test_structure 5, test_thermal 5, test_flight 8,
   test_solver 2 @slow (**13.2 infeasible mission → binding constraint + numeric fix**).
 
+## Phase 3 — export (done)
+
+- `core/export/{eng,rse,tabular,drawing,report}.py`, `core/branding.py`, `core/i18n.py`.
+- `services/{design,simulation,export}_service.py`. `mission_service.py` still TODO (Phase 4,
+  wraps `core.solver.solve_mission` in a ProcessPool + job store).
+- `data/propellants/kndx.yaml`.
+- Tests: test_export (11), test_services (4), test_extensibility (3). 99 total (97 fast + 2 slow).
+
 ## Next step
 
-Phase 3 — export writers (`core/export/` or `services/export_service.py`):
-`.eng` (RASP, ≤32 pts, impulse within 1%, ends at 0), `.rse` (RockSim XML, time-varying
-mass+CG), CSV (full-res), JSON (versioned design schema), PDF (ReportLab). Round-trip +
-downsampling tests. Then `services/{design,simulation,mission}_service.py`.
+Phase 4 — `backend/api/` FastAPI app, `backend/models/` SQLAlchemy + Alembic, JWT auth
+(Argon2id), admin endpoints, OpenAPI. `services/mission_service.py` +
+`services/infra.py` (RateLimiter, JobStore abstract + in-memory impls) +
+`ProcessPoolExecutor` wiring per Section 12.2. `tests/load/` concurrency test.
+Config via pydantic-settings reading os.environ (fail loudly if secrets missing).
 
 ## Last files touched
 
-- `backend/core/{materials,assembly,structure,thermal,flight,solver,cli}.py`
-- `backend/data/materials/*.yaml`
-- `backend/tests/test_{assembly,structure,thermal,flight,solver}.py`
+- `backend/core/export/*`, `backend/core/{branding,i18n}.py`
+- `backend/services/{design,simulation,export}_service.py`
+- `backend/data/propellants/kndx.yaml`
+- `backend/tests/test_{export,services,extensibility}.py`

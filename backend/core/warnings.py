@@ -118,6 +118,11 @@ def make(code: str, level: Level | None = None, **params) -> Warning:
     return Warning(code=code, level=level or _CATALOGUE[code], params=dict(params))
 
 
+def warning_catalogue() -> dict[str, str]:
+    """Public ``{code: level}`` map (level as its string value) for the API catalogue."""
+    return {code: level.value for code, level in _CATALOGUE.items()}
+
+
 def highest_level(warnings: list[Warning]) -> Level:
     """The most severe level in a list (info if empty)."""
     order = {Level.INFO: 0, Level.WARNING: 1, Level.DANGER: 2}

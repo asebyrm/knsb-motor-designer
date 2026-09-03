@@ -51,6 +51,7 @@ packages = ["core", "core.grains", "services", "api", "models"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "W"]
