@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api, type Catalog } from "../api";
 import { Charts } from "../components/Charts";
 import { EngineCrossSection } from "../components/EngineCrossSection";
-import { GrainCrossSection } from "../components/GrainCrossSection";
+import { LiveCrossSections } from "../components/LiveCrossSections";
 import { MissionPanel } from "../components/MissionPanel";
 import { ParamPanel } from "../components/ParamPanel";
 import { ResultsPanel } from "../components/ResultsPanel";
@@ -69,7 +69,7 @@ export function Designer({ catalog }: { catalog: Catalog | undefined }) {
           <Tabs
             tabs={[
               { id: "curves", label: t("ui.curves") },
-              { id: "cross_section", label: t("ui.cross_section") },
+              { id: "cross_section", label: t("ui.technical_report") },
             ]}
             active={tab}
             onChange={(id) => setTab(id as "curves" | "cross_section")}
@@ -82,9 +82,6 @@ export function Designer({ catalog }: { catalog: Catalog | undefined }) {
           {tab === "curves" ? (
             <div className="space-y-4">
               {result && <Charts result={result} webFraction={webFraction} />}
-              {result && (
-                <GrainCrossSection design={design} result={result} webFraction={webFraction} />
-              )}
               <div>
                 <label className="field-label">{t("ui.web_slider")}</label>
                 <input
@@ -97,6 +94,7 @@ export function Designer({ catalog }: { catalog: Catalog | undefined }) {
                   className="w-full"
                 />
               </div>
+              <LiveCrossSections result={result} />
             </div>
           ) : (
             <EngineCrossSection result={result} />

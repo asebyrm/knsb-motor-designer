@@ -1,18 +1,14 @@
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { api } from "../api";
+import { PART_FIT_CODES } from "../lib/drawing";
 import { CONV } from "../lib/units";
 import { useStore } from "../store";
 import type { DesignDoc, SimResult } from "../types";
 import { Info } from "./ui";
 
 type Part = SimResult["assembly"]["parts"][number];
-
-const PART_FIT_CODES: Record<string, string[]> = {
-  grain: ["WARN_FIT_GRAIN_DIAMETER", "WARN_FIT_GRAIN_LENGTH"],
-  nozzle: ["WARN_FIT_THROAT_VS_CASE"],
-  liner: ["WARN_FIT_LINER_STACK"],
-};
 
 interface DimRow {
   id: string;
@@ -39,11 +35,12 @@ function burntCoreDia(g: DesignDoc["grain"], frac: number): number {
 }
 
 export function EngineCrossSection({ result }: { result: SimResult | undefined }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { design, units, setField, webFraction } = useStore();
   const svgRef = useRef<SVGSVGElement>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [section, setSection] = useState<"long" | "trans">("long");
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [layers, setLayers] = useState({
     dimensions: true,
     part_names: true,
@@ -98,6 +95,15 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
     URL.revokeObjectURL(url);
   }
 
+  async function downloadPdf() {
+    setPdfBusy(true);
+    try {
+      await api.exportFile(design, "pdf", i18n.language === "tr" ? "tr" : "en", false);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   const drawing =
     section === "long" ? (
       <LongitudinalSVG
@@ -114,6 +120,11 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
 
   return (
     <div className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold">{t("ui.technical_report")}</h2>
+        <p className="text-xs text-text-secondary">{t("ui.technical_report_hint")}</p>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <div className="flex overflow-hidden rounded-md border border-border">
           {(["long", "trans"] as const).map((s) => (
@@ -139,9 +150,14 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
             {t(`ui.layer_${k}`)}
           </label>
         ))}
-        <button className="btn-ghost ml-auto text-xs" onClick={downloadSvg}>
-          {t("ui.download_drawing")}
-        </button>
+        <span className="ml-auto flex items-center gap-2">
+          <button className="btn-ghost text-xs" onClick={downloadSvg}>
+            {t("ui.download_drawing")}
+          </button>
+          <button className="btn-primary text-xs" onClick={downloadPdf} disabled={pdfBusy}>
+            {pdfBusy ? t("ui.recalculating") : t("ui.download_pdf_report")}
+          </button>
+        </span>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">{drawing}</div>
@@ -210,7 +226,7 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
  * labels. Still scaled from the real geometry (part x-positions + nozzle angles) and
  * animated by the web slider.
  */
-function LongitudinalSVG({
+export function LongitudinalSVG({
   svgRef,
   parts,
   design,
@@ -495,7 +511,7 @@ function LongitudinalSVG({
 
 /* ---------------------------------------------------- transverse cross-section */
 
-function TransverseSVG({
+export function TransverseSVG({
   svgRef,
   design,
   webFraction,
