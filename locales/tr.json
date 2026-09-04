@@ -39,6 +39,7 @@
     "materials_catalog_value": "Katalog değeri",
     "materials_your_value": "Senin değerin",
     "materials_reset": "Katalog değerine sıfırla",
+    "materials_burn_rate": "Yanma hızı yasası (parçalı Saint-Robert, rb = a·p^n)",
     "formulas_tab": "Formüller",
     "formulas_hint": "Hesaplamanın her aşamasında bu programın hangi formülü kullandığı, platformun şu anki haliyle. Bu sayfa program geliştikçe güncellenir - yakın zamanlı bir değişikliğin gerisinde kalmış olabilir; nihai kaynak her zaman backend/core/ kodudur.",
     "results": "Sonuçlar",
@@ -111,7 +112,12 @@
       "max_service_temp": "Maks. servis sıcaklığı",
       "ablation_rate": "Erezyon (ablasyon) hızı",
       "min_thickness": "Önerilen min. kalınlık",
-      "max_interface_temp": "Maks. arayüz sıcaklığı"
+      "max_interface_temp": "Maks. arayüz sıcaklığı",
+      "density_ideal": "İdeal yoğunluk",
+      "c_star_ideal": "c* (ideal)",
+      "gamma": "Özgül ısı oranı (γ)",
+      "flame_temperature": "Alev sıcaklığı",
+      "molar_mass": "Egzoz molar kütlesi"
     }
   },
   "formulas": {
@@ -419,7 +425,12 @@
         "max_service_temp": "Isıl kontrolün karşılaştırdığı sürekli kullanım sıcaklık sınırı.",
         "ablation_rate": "Liner'ın açık yüzeyinin KNSB alev koşullarında ne hızla geri çekildiği - yanma süren için önerilen minimum kalınlığı belirler.",
         "min_thickness": "Yanma süresi erezyon payı eklenmeden önceki taban liner kalınlığı önerisi.",
-        "max_interface_temp": "Liner'ın dış yüzünün (case'e karşı) altında kalması gereken sıcaklık."
+        "max_interface_temp": "Liner'ın dış yüzünün (case'e karşı) altında kalması gereken sıcaklık.",
+        "density_ideal": "Tam yoğun (boşluksuz) dökülmüş yakıtın yoğunluğu. Gerçek grain'in bunun aşağıdaki yoğunluk katsayısı ile çarpımı kadardır.",
+        "c_star_ideal": "Teorik karakteristik egzoz hızı. Gerçek grain'in bunun aşağıdaki c* verimiyle çarpımı kadardır.",
+        "gamma": "Yanma gazının özgül ısı oranı - itki katsayısı ve çıkış Mach sayısını besler.",
+        "flame_temperature": "Adyabatik alev sıcaklığı - ısıl/liner kontrolünün liner'ının sınırına karşı karşılaştırdığı değer.",
+        "molar_mass": "Egzoz gazının ortalama molar kütlesi."
       }
     }
   },

@@ -43,6 +43,11 @@ const PROP_FMT: Record<string, PropFmt> = {
   ablation_rate: { suffix: "mm/s", toDisplay: (v) => v * 1000, fromDisplay: (v) => v / 1000, digits: 3 },
   min_thickness: { suffix: "mm", toDisplay: (v) => v * 1000, fromDisplay: (v) => v / 1000, digits: 2 },
   max_interface_temp: { suffix: "K", toDisplay: (v) => v, fromDisplay: (v) => v, digits: 0 },
+  density_ideal: { suffix: "kg/m³", toDisplay: (v) => v, fromDisplay: (v) => v, digits: 0 },
+  c_star_ideal: { suffix: "m/s", toDisplay: (v) => v, fromDisplay: (v) => v, digits: 1 },
+  gamma: { suffix: "", toDisplay: (v) => v, fromDisplay: (v) => v, digits: 4 },
+  flame_temperature: { suffix: "K", toDisplay: (v) => v, fromDisplay: (v) => v, digits: 0 },
+  molar_mass: { suffix: "g/mol", toDisplay: (v) => v, fromDisplay: (v) => v, digits: 2 },
 };
 
 interface Slot {
@@ -57,6 +62,7 @@ interface Slot {
 export function MaterialsPanel({ catalog }: { catalog: Catalog | undefined }) {
   const { t } = useTranslation();
   const { design } = useStore();
+  const propellant = catalog?.propellants.find((p) => p.id === design.propellant.id);
 
   const slots: Slot[] = [
     { key: "case", titleKey: "group.case", materialId: design.case.material_id,
@@ -77,9 +83,111 @@ export function MaterialsPanel({ catalog }: { catalog: Catalog | undefined }) {
   return (
     <div className="space-y-4 p-3">
       <p className="text-xs text-text-secondary">{t("ui.materials_hint")}</p>
+      {propellant && <PropellantCard propellant={propellant} />}
       {slots.map((slot) => (
         <MaterialCard key={slot.key} slot={slot} />
       ))}
+    </div>
+  );
+}
+
+const PROPELLANT_REF_PROPS = ["density_ideal", "c_star_ideal", "gamma", "flame_temperature",
+  "molar_mass"] as const;
+
+function PropellantCard({ propellant }: { propellant: NonNullable<Catalog["propellants"]>[number] }) {
+  const { t } = useTranslation();
+  const { design, setField } = useStore();
+  const densityFactor = design.propellant.density_factor ?? 0.95;
+  const cStarEfficiency = design.propellant.c_star_efficiency ?? 0.95;
+
+  return (
+    <div className="card p-3">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-sm font-semibold">{t("group.propellant")}</span>
+        <span className="font-mono text-xs text-text-secondary">{propellant.id}</span>
+      </div>
+      <p className="mb-2 text-xs text-text-secondary">{propellant.composition}</p>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left text-text-secondary">
+            <th className="py-1 font-normal">{t("ui.materials_property")}</th>
+            <th className="py-1 text-right font-normal">{t("ui.materials_catalog_value")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PROPELLANT_REF_PROPS.map((prop) => {
+            const fmt = PROP_FMT[prop];
+            const v = propellant.properties[prop];
+            if (v == null) return null;
+            return (
+              <tr key={prop} className="border-t border-border/60">
+                <td className="py-1 pr-2">
+                  <span className="flex items-center">
+                    {t(`materials.prop.${prop}`)}
+                    <Info tKey={`info.materials.prop.${prop}`} />
+                  </span>
+                </td>
+                <td className="py-1 text-right font-mono">
+                  {fmt.toDisplay(v).toFixed(fmt.digits)} {fmt.suffix}
+                </td>
+              </tr>
+            );
+          })}
+          <tr className="border-t border-border/60">
+            <td className="py-1 pr-2">
+              <span className="flex items-center">
+                {t("param.density_factor")}
+                <Info tKey="info.param.density_factor" />
+              </span>
+            </td>
+            <td className="py-1 text-right">
+              <input type="number" className="input w-20 text-right" step={0.01} min={0} max={1.2}
+                value={densityFactor}
+                onChange={(e) => setField("propellant.density_factor", Number(e.target.value))} />
+              <span className="ml-1 text-text-secondary">
+                = {(propellant.properties.density_ideal * densityFactor).toFixed(0)} kg/m³
+              </span>
+            </td>
+          </tr>
+          <tr className="border-t border-border/60">
+            <td className="py-1 pr-2">
+              <span className="flex items-center">
+                {t("param.c_star_efficiency")}
+                <Info tKey="info.param.c_star_efficiency" />
+              </span>
+            </td>
+            <td className="py-1 text-right">
+              <input type="number" className="input w-20 text-right" step={0.01} min={0} max={1.2}
+                value={cStarEfficiency}
+                onChange={(e) => setField("propellant.c_star_efficiency", Number(e.target.value))} />
+              <span className="ml-1 text-text-secondary">
+                = {(propellant.properties.c_star_ideal * cStarEfficiency).toFixed(0)} m/s
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="mb-1 mt-3 text-xs font-medium text-text-secondary">
+        {t("ui.materials_burn_rate")}
+      </p>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left text-text-secondary">
+            <th className="py-1 font-normal">p (MPa)</th>
+            <th className="py-1 text-right font-normal">a</th>
+            <th className="py-1 text-right font-normal">n</th>
+          </tr>
+        </thead>
+        <tbody>
+          {propellant.burn_rate_ranges.map((r, i) => (
+            <tr key={i} className="border-t border-border/60 font-mono">
+              <td className="py-1">{r.p_min_mpa.toFixed(2)}–{r.p_max_mpa.toFixed(2)}</td>
+              <td className="py-1 text-right">{r.a.toFixed(3)}</td>
+              <td className="py-1 text-right">{r.n.toFixed(3)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -37,7 +37,11 @@ export class ApiError extends Error {
 
 export interface Catalog {
   schema_version: number;
-  propellants: Array<{ id: string; file: string; name_tr: string; name_en: string }>;
+  propellants: Array<{
+    id: string; file: string; name_tr: string; name_en: string; composition: string;
+    properties: Record<string, number>;
+    burn_rate_ranges: Array<{ p_min_mpa: number; p_max_mpa: number; a: number; n: number }>;
+  }>;
   grains: string[];
   case_materials: Array<{
     id: string; name_tr: string; name_en: string; notes_key: string;

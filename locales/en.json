@@ -39,6 +39,7 @@
     "materials_catalog_value": "Catalog value",
     "materials_your_value": "Your value",
     "materials_reset": "Reset to catalog value",
+    "materials_burn_rate": "Burn-rate law (piecewise Saint-Robert, rb = a·p^n)",
     "formulas_tab": "Formulas",
     "formulas_hint": "Which formula this program uses for each stage of the calculation, in the platform's current state. This page is updated as the program develops - it may lag a recent change; the source (backend/core/) is always the final authority.",
     "results": "Results",
@@ -111,7 +112,12 @@
       "max_service_temp": "Max service temperature",
       "ablation_rate": "Ablation rate",
       "min_thickness": "Recommended min. thickness",
-      "max_interface_temp": "Max interface temperature"
+      "max_interface_temp": "Max interface temperature",
+      "density_ideal": "Ideal density",
+      "c_star_ideal": "c* (ideal)",
+      "gamma": "Specific heat ratio (γ)",
+      "flame_temperature": "Flame temperature",
+      "molar_mass": "Exhaust molar mass"
     }
   },
   "formulas": {
@@ -419,7 +425,12 @@
         "max_service_temp": "The continuous-use temperature limit the thermal check compares against.",
         "ablation_rate": "How fast the liner's exposed surface recedes at KNSB flame conditions - drives the recommended minimum thickness for your burn time.",
         "min_thickness": "Baseline liner thickness recommendation before the burn-time ablation allowance is added.",
-        "max_interface_temp": "The temperature the liner's outer face (against the case) should stay under."
+        "max_interface_temp": "The temperature the liner's outer face (against the case) should stay under.",
+        "density_ideal": "Density of the fully-dense (no voids) cast propellant. Your actual grain is this times the density factor below.",
+        "c_star_ideal": "Theoretical characteristic exhaust velocity. Your actual grain is this times the c* efficiency below.",
+        "gamma": "Ratio of specific heats of the combustion gas - feeds the thrust coefficient and exit Mach number.",
+        "flame_temperature": "Adiabatic flame temperature - what the thermal/liner check compares your liner's rating against.",
+        "molar_mass": "Average molar mass of the exhaust gas."
       }
     }
   },

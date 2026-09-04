@@ -30,6 +30,19 @@ def catalog() -> dict:
             "id": p.id, "file": pid, "name_tr": p.name_tr, "name_en": p.name_en,
             "composition": p.composition, "density_ideal": p.density_ideal,
             "gamma": p.gamma, "flame_temperature": p.flame_temperature,
+            # full property set (Section 5.1), for the Materials tab - density and
+            # c* also have a user-adjustable factor (design.propellant.density_factor
+            # / c_star_efficiency, "Static-fire calibration"), which this catalog
+            # entry does not carry - only the catalog's own reference values do
+            "properties": {
+                "density_ideal": p.density_ideal, "c_star_ideal": p.c_star_ideal,
+                "gamma": p.gamma, "flame_temperature": p.flame_temperature,
+                "molar_mass": p.molar_mass,
+            },
+            "burn_rate_ranges": [
+                {"p_min_mpa": r.p_min_mpa, "p_max_mpa": r.p_max_mpa, "a": r.a, "n": r.n}
+                for r in p.burn_rate_ranges
+            ],
         })
     return {
         "schema_version": DESIGN_SCHEMA_VERSION,
