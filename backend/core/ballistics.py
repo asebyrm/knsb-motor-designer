@@ -162,7 +162,10 @@ def _march_once(
                 break
 
         p_for_cf = max(p_c, 1.2 * ambient_pressure)
-        cf = nozzle.thrust_coefficient(p_for_cf, ambient_pressure, gamma)
+        # pass the current (possibly eroded) throat area so Cf reflects the
+        # effective expansion ratio at that throat size, not the nominal one -
+        # equal to a_t0 when erosion is off, so this changes nothing there
+        cf = nozzle.thrust_coefficient(p_for_cf, ambient_pressure, gamma, throat_area=a_t)
         thrust = max(cf * p_c * a_t, 0.0)
         mdot = p_c * a_t / cstar
         impulse += thrust * dt

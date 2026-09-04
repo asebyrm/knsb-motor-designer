@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -11,6 +13,7 @@ from core.ballistics import (
     simulate,
 )
 from core.examples import mid_flight_motor, small_test_motor
+from core.nozzle import ErosionParams
 from core.units import G0
 
 
@@ -48,6 +51,23 @@ def test_dt_convergence(mid_result):
         fine.summary["total_impulse"]
     assert rel < 0.01
     assert res.converged
+
+
+def test_erosion_lowers_pressure_but_not_the_meop_relevant_trace():
+    """Erosion opens the throat over the burn, lowering Kn and so the actual
+    pressure - but MEOP must still be judged on the untouched erosionless trace
+    (Section 5.3): never a way to "fix" over-pressure."""
+    ex = small_test_motor()
+    eroding = dataclasses.replace(
+        ex.nozzle, erosion=ErosionParams(enabled=True, coefficient_mm_s=0.08, exponent=0.8))
+    res_off = simulate(ex.grain, ex.propellant, ex.nozzle, meop_pa=ex.meop_pa)
+    res_on = simulate(ex.grain, ex.propellant, eroding, meop_pa=ex.meop_pa)
+
+    assert res_on.summary["peak_pressure_bar"] < res_off.summary["peak_pressure_bar"]
+    # the erosionless companion must be (almost) unaffected by turning erosion on -
+    # it is computed off a throat area that never erodes either way
+    assert res_on.summary["peak_pressure_no_erosion_bar"] == pytest.approx(
+        res_off.summary["peak_pressure_no_erosion_bar"], rel=0.01)
 
 
 def test_downsample_preserves_impulse(mid_result):

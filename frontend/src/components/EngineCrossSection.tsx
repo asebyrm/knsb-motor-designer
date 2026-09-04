@@ -348,11 +348,19 @@ export function LongitudinalSVG({
     );
   }
 
-  // liner — the band between the case bore and the grain OD (skipped where too thin to see)
+  // liner — the band between the case bore and the grain OD (skipped where too thin to see).
+  // Kept at least a couple of px wide on screen even when the true clearance is very
+  // tight (or zero, a snug fit) by drawing the grain very slightly smaller than its
+  // real OD here - a schematic legibility exaggeration only, the dimension table and
+  // physics both keep using the real grain.outer_diameter untouched.
   const linerTmm = (design.liner?.thickness ?? 0) * 1000;
+  const MIN_LINER_PX = 3;
+  const rGrainODraw = linerTmm > 0.01
+    ? Math.max(Math.min(rGrainO, rCaseI - linerTmm - MIN_LINER_PX / scale), rGrainO * 0.7)
+    : rGrainO;
   if (linerTmm > 0.01) {
     const rLinerO = rCaseI;
-    const rLinerI = Math.max(rCaseI - linerTmm, rGrainO);
+    const rLinerI = Math.max(rCaseI - linerTmm, rGrainODraw);
     const lc = linerColor(design.liner?.material_id);
     for (const sign of [-1, 1]) {
       const yA = sign < 0 ? yUp(rLinerO) : yDn(rLinerI);
@@ -389,9 +397,10 @@ export function LongitudinalSVG({
     const w = (xbNow - xaNow) * scale;
     // green propellant remaining
     for (const sign of [-1, 1]) {
-      const yA = sign < 0 ? yUp(rGrainO) : yDn(rInner);
+      const yA = sign < 0 ? yUp(rGrainODraw) : yDn(rInner);
       els.push(
-        <rect key={`prop-${i}-${sign}`} x={sx(xaNow)} y={yA} width={w} height={(rGrainO - rInner) * scale}
+        <rect key={`prop-${i}-${sign}`} x={sx(xaNow)} y={yA} width={w}
+          height={(rGrainODraw - rInner) * scale}
           fill="var(--propellant)" stroke={grainStroke} strokeWidth={1}>
           <title>{`${t("drawing.propellant")} · ${design.propellant.id}`}</title>
         </rect>,
@@ -508,9 +517,9 @@ export function LongitudinalSVG({
         for (const xf of [xaNow, xbNow]) {
           els.push(
             <line key={`flame-face-${i}-${xf === xaNow ? "a" : "b"}-top`} x1={sx(xf)} y1={yUp(rBoreNow)}
-              x2={sx(xf)} y2={yUp(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
+              x2={sx(xf)} y2={yUp(rGrainODraw)} stroke="var(--flame)" strokeWidth={2} />,
             <line key={`flame-face-${i}-${xf === xaNow ? "a" : "b"}-bot`} x1={sx(xf)} y1={yDn(rBoreNow)}
-              x2={sx(xf)} y2={yDn(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
+              x2={sx(xf)} y2={yDn(rGrainODraw)} stroke="var(--flame)" strokeWidth={2} />,
           );
         }
       }
@@ -519,7 +528,7 @@ export function LongitudinalSVG({
     // end-burner: a transverse flame face that recedes
     const xf = gx0 + webFraction * (gx1 - gx0);
     els.push(
-      <line key="flame-eb" x1={sx(xf)} y1={yUp(rGrainO)} x2={sx(xf)} y2={yDn(rGrainO)}
+      <line key="flame-eb" x1={sx(xf)} y1={yUp(rGrainODraw)} x2={sx(xf)} y2={yDn(rGrainODraw)}
         stroke="var(--flame)" strokeWidth={3} />,
     );
   }
@@ -628,6 +637,14 @@ export function TransverseSVG({
   const rCore = burntCoreDia(g, webFraction) / 2;
   const rCoreInit = g.core_diameter / 2;
   const k = (c - 16) / rCaseO; // scale m -> px
+  // keep at least a couple of px of visible liner ring even when the true
+  // clearance between the liner bore and the grain OD is very tight (or zero,
+  // a snug design) - a schematic legibility exaggeration for the drawing only,
+  // never for the dimension table or any real physics
+  const MIN_LINER_PX = 3;
+  const rGrainODraw = linerT > 0
+    ? Math.max(Math.min(rGrainO, rLinerI - MIN_LINER_PX / k), rGrainO * 0.7)
+    : rGrainO;
   const ring = (r: number, fill: string, s: string, sw = 1, dash?: string) => (
     <circle cx={c} cy={c} r={r * k} fill={fill} stroke={s} strokeWidth={sw} strokeDasharray={dash} />
   );
@@ -698,7 +715,7 @@ export function TransverseSVG({
       {linerT > 0 &&
         ring(rLinerI, linerColor(design.liner?.material_id), badPart("liner") ? "var(--error)" : "currentColor")}
       {/* propellant (green) */}
-      {ring(rGrainO, "var(--propellant)",
+      {ring(rGrainODraw, "var(--propellant)",
         badPart("grain") ? "var(--error)" : "var(--propellant-stroke)", badPart("grain") ? 1.8 : 1.2)}
       {bore}
       <text x={c} y={S - 6} textAnchor="middle" fontSize={11} fill="var(--dim-derived)">
@@ -734,12 +751,17 @@ export function NozzleTechnicalSVG({
   const throatLen = nz.throat_length * 1000 || 0.3 * rT;
   const divLen = Math.max(rE - rT, 0) / Math.tan(deg(nz.divergence_half_angle_deg));
   const totalLen = Math.max(convLen + throatLen + divLen, 1);
+  // the body is machined from round stock - a plain cylinder on the outside,
+  // wide enough to contain the flow contour's widest point (the chamber bore or
+  // the exit, whichever is larger) with a wall margin, bored out to the actual
+  // gas-dynamic shape on the inside
+  const rOuter = Math.max(rChamber, rE) + Math.max(rT * 0.5, 5);
 
   const W = 680;
   const PADX = 100;
   const PADY = 92;
   const scale = (W - 2 * PADX) / totalLen;
-  const dMax = 2 * Math.max(rChamber, rE);
+  const dMax = 2 * rOuter;
   const H = Math.round(dMax * scale) + 2 * PADY;
   const axisY = PADY + (dMax * scale) / 2;
   const sx = (xmm: number) => PADX + xmm * scale;
@@ -749,34 +771,26 @@ export function NozzleTechnicalSVG({
   const pConv = convLen;
   const pThroat = pConv + throatLen;
   const pExit = pThroat + divLen;
-  const wallT = Math.max(rT * 0.7, 4);
-  const wallE = Math.max(rE * 0.4, 4);
   const isBell = nz.contour_type === "bell";
   const nozStroke = badPart("nozzle") ? "var(--error)" : "var(--nozzle-metal-stroke)";
 
   // each half (top/bottom) is its own closed wedge tracing the outer profile out
   // to the exit and the inner (flow) profile back - never a solid filled bell -
   // so the flow passage is naturally unfilled (background shows through) instead
-  // of needing a separate cavity shape drawn over it
-  const divOuter = (yy: (r: number) => number) =>
-    isBell
-      ? `C ${sx(pThroat + divLen * 0.3)} ${yy(rT + wallT)} ${sx(pExit - divLen * 0.15)} ${yy(rE + wallE)} ` +
-        `${sx(pExit)} ${yy(rE + wallE)} `
-      : `L ${sx(pExit)} ${yy(rE + wallE)} `;
+  // of needing a separate cavity shape drawn over it. The convergent inner
+  // section is a straight cone at convergence_half_angle (that is what the
+  // parameter means), not a curve.
   const divInner = (yy: (r: number) => number) =>
     isBell
       ? `C ${sx(pExit - divLen * 0.15)} ${yy(rE)} ${sx(pThroat + divLen * 0.3)} ${yy(rT)} ${sx(pThroat)} ${yy(rT)} `
       : `L ${sx(pThroat)} ${yy(rT)} `;
   const bell = (yy: (r: number) => number) =>
-    `M ${sx(0)} ${yy(rChamber)} ` +
-    `L ${sx(pConv - convLen * 0.15)} ${yy(rChamber * 0.97)} ` +
-    `Q ${sx(pConv - convLen * 0.15)} ${yy(rT + wallT)} ${sx(pConv)} ${yy(rT + wallT)} ` +
-    `L ${sx(pThroat)} ${yy(rT + wallT)} ` +
-    `${divOuter(yy)}` +
+    `M ${sx(0)} ${yy(rOuter)} ` +
+    `L ${sx(pExit)} ${yy(rOuter)} ` +
     `L ${sx(pExit)} ${yy(rE)} ` +
     `${divInner(yy)}` +
     `L ${sx(pConv)} ${yy(rT)} ` +
-    `Q ${sx(pConv - convLen * 0.15)} ${yy(rChamber * 0.9)} ${sx(0)} ${yy(rChamber)} Z`;
+    `L ${sx(0)} ${yy(rChamber)} Z`;
   const material = nz.material_id ?? design.case.material_id;
 
   return (
@@ -802,11 +816,11 @@ export function NozzleTechnicalSVG({
           derived />
         <DimLine x1={sx(0)} x2={sx(pExit)} y={H - PADY + 30} label={`L_total ${totalLen.toFixed(1)} mm`} />
 
-        <text x={sx(pConv / 2)} y={yUp(rChamber) - 10} textAnchor="middle" fontSize={11}
+        <text x={sx(pConv / 2)} y={yUp(rOuter) - 10} textAnchor="middle" fontSize={11}
           fill="var(--dim-derived)">
           {t("param.convergence_half_angle")} {nz.convergence_half_angle_deg.toFixed(0)}°
         </text>
-        <text x={sx(pThroat + divLen / 2)} y={yUp(rE + wallE) - 10} textAnchor="middle" fontSize={11}
+        <text x={sx(pThroat + divLen / 2)} y={yUp(rOuter) - 10} textAnchor="middle" fontSize={11}
           fill="var(--dim-derived)">
           {t("param.divergence_half_angle")} {nz.divergence_half_angle_deg.toFixed(0)}° · {isBell ? "Bell" : "Conic"}
         </text>

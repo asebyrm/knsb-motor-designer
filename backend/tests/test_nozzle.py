@@ -70,3 +70,40 @@ def test_erosion_rate_and_unrealistic_warning():
     assert e.validate() == []
     bad = ErosionParams(enabled=True, coefficient_mm_s=1.6)
     assert bad.validate()[0].code == "WARN_UNREALISTIC_EROSION"
+
+
+def test_eroded_throat_lowers_effective_expansion_ratio():
+    """Only the throat erodes at a meaningful rate (Section 5.3); the exit is
+    physically fixed, so a grown throat means a *smaller* effective expansion
+    ratio (exit_area is fixed, throat_area grew) - not the nominal one."""
+    n = Nozzle(throat_diameter=0.012, expansion_ratio=6.0)
+    a_t0 = n.throat_area
+    a_t_eroded = a_t0 * 1.44  # a throat radius grown 20%
+    assert n.exit_area / a_t_eroded == pytest.approx(6.0 / 1.44)
+    # thrust_coefficient must actually use that smaller ratio, not the nominal one
+    cf_nominal = n.thrust_coefficient(3.0e6, P_ATM_SEA_LEVEL, GAMMA)
+    cf_eroded = n.thrust_coefficient(3.0e6, P_ATM_SEA_LEVEL, GAMMA, throat_area=a_t_eroded)
+    assert cf_eroded != pytest.approx(cf_nominal, rel=1e-6)
+    # and it must match calling exit_pressure with that ratio directly
+    p_e_direct = n.exit_pressure(3.0e6, GAMMA, expansion_ratio=n.exit_area / a_t_eroded)
+    p_e_via_cf_path = n.exit_pressure(3.0e6, GAMMA, n.exit_area / a_t_eroded)
+    assert p_e_direct == pytest.approx(p_e_via_cf_path)
+
+
+def test_thrust_with_explicit_throat_area_matches_nominal_when_unchanged():
+    """Passing throat_area == the nozzle's own nominal throat_area must reproduce
+    exactly the no-argument call (this is the erosion-disabled / regression-test
+    path: a_t stays == a_t0 for the whole burn, so nothing may change there)."""
+    n = Nozzle(throat_diameter=0.012, expansion_ratio=5.0)
+    f_default = n.thrust(3.0e6, P_ATM_SEA_LEVEL, GAMMA)
+    f_explicit = n.thrust(3.0e6, P_ATM_SEA_LEVEL, GAMMA, throat_area=n.throat_area)
+    assert f_explicit == pytest.approx(f_default, rel=1e-12)
+
+
+def test_thrust_scales_with_eroded_throat_area():
+    n = Nozzle(throat_diameter=0.012, expansion_ratio=5.0)
+    a_t0 = n.throat_area
+    f_nominal = n.thrust(3.0e6, P_ATM_SEA_LEVEL, GAMMA)
+    f_eroded = n.thrust(3.0e6, P_ATM_SEA_LEVEL, GAMMA, throat_area=a_t0 * 1.2)
+    # dominated by the larger throat area even though Cf itself also shifts
+    assert f_eroded > f_nominal

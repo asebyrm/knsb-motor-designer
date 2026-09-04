@@ -89,8 +89,16 @@ class Nozzle:
 
     # --- gas dynamics ---------------------------------------------------
 
-    def exit_mach(self, gamma: float) -> float:
-        """Supersonic solution of the area-Mach relation for the current eps."""
+    def exit_mach(self, gamma: float, expansion_ratio: float | None = None) -> float:
+        """Supersonic solution of the area-Mach relation for ``expansion_ratio``
+        (the nominal ``self.expansion_ratio`` if not given).
+
+        Only the throat erodes at any meaningful rate (Section 5.3) - the exit is
+        physically fixed, so an eroded throat's *effective* expansion ratio is
+        smaller than the nominal, un-eroded one. Callers tracking erosion pass
+        that effective ratio explicitly; everyone else gets the nominal value,
+        unchanged from before this parameter existed.
+        """
         from scipy.optimize import brentq
 
         g = gamma
@@ -99,33 +107,43 @@ class Nozzle:
         def area_ratio(m: float) -> float:
             return (1.0 / m) * ((2.0 / (g + 1.0)) * (1.0 + 0.5 * (g - 1.0) * m * m)) ** exp
 
-        target = self.expansion_ratio
+        target = self.expansion_ratio if expansion_ratio is None else expansion_ratio
         return float(brentq(lambda m: area_ratio(m) - target, 1.0 + 1e-9, 60.0, maxiter=200))
 
-    def exit_pressure(self, p_c_pa: float, gamma: float) -> float:
+    def exit_pressure(self, p_c_pa: float, gamma: float,
+                       expansion_ratio: float | None = None) -> float:
         """Isentropic exit static pressure [Pa]."""
-        m_e = self.exit_mach(gamma)
+        m_e = self.exit_mach(gamma, expansion_ratio)
         g = gamma
         return p_c_pa * (1.0 + 0.5 * (g - 1.0) * m_e * m_e) ** (-g / (g - 1.0))
 
-    def thrust_coefficient(self, p_c_pa: float, p_ambient_pa: float, gamma: float) -> float:
-        """Actual thrust coefficient Cf (divergence + efficiency losses applied)."""
+    def thrust_coefficient(self, p_c_pa: float, p_ambient_pa: float, gamma: float,
+                            throat_area: float | None = None) -> float:
+        """Actual thrust coefficient Cf (divergence + efficiency losses applied).
+
+        Pass the *current* (possibly eroded) ``throat_area`` to get Cf for the
+        effective expansion ratio at that throat size (``exit_area`` is the fixed,
+        nominal one - see :meth:`exit_mach`); omitted, this is the nominal Cf,
+        identical to before this parameter existed.
+        """
         g = gamma
-        p_e = self.exit_pressure(p_c_pa, gamma)
+        eps = self.expansion_ratio if throat_area is None else self.exit_area / throat_area
+        p_e = self.exit_pressure(p_c_pa, gamma, eps)
         momentum = math.sqrt(
             (2.0 * g * g / (g - 1.0))
             * (2.0 / (g + 1.0)) ** ((g + 1.0) / (g - 1.0))
             * (1.0 - (p_e / p_c_pa) ** ((g - 1.0) / g))
         )
-        pressure_term = (p_e - p_ambient_pa) / p_c_pa * self.expansion_ratio
+        pressure_term = (p_e - p_ambient_pa) / p_c_pa * eps
         cf_ideal = momentum + pressure_term
         return self.divergence_loss * self.efficiency * cf_ideal
 
     def thrust(self, p_c_pa: float, p_ambient_pa: float, gamma: float,
                throat_area: float | None = None) -> float:
-        """F = Cf * p_c * A_t [N]. Pass ``throat_area`` to use an eroded throat."""
+        """F = Cf * p_c * A_t [N]. Pass ``throat_area`` to use an eroded throat -
+        this also feeds Cf's effective expansion ratio (see thrust_coefficient)."""
         a_t = self.throat_area if throat_area is None else throat_area
-        return self.thrust_coefficient(p_c_pa, p_ambient_pa, gamma) * p_c_pa * a_t
+        return self.thrust_coefficient(p_c_pa, p_ambient_pa, gamma, throat_area) * p_c_pa * a_t
 
     # --- expansion tuning / checks -----------------------------------
 
