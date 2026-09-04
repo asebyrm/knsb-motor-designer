@@ -60,16 +60,18 @@ export function FieldRow({
       options = (catalog?.case_materials ?? []).map((m) => m.id);
     if (field.id === "liner_material")
       options = (catalog?.liner_materials ?? []).map((m) => m.id);
+    if (field.id === "nozzle_material")
+      options = ["", ...(catalog?.case_materials ?? []).map((m) => m.id)];
     control = (
       <select
         className="input"
         value={String(raw ?? "")}
-        onChange={(e) => setField(field.path, e.target.value)}
+        onChange={(e) => setField(field.path, e.target.value === "" ? null : e.target.value)}
         aria-label={label}
       >
         {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
+          <option key={o || "__same_as_case"} value={o}>
+            {o === "" ? t("ui.same_as_case") : o}
           </option>
         ))}
       </select>
@@ -136,7 +138,13 @@ export function ParamPanel({
               g === "nozzle" &&
               (f.id === "erosion_coefficient" || f.id === "erosion_exponent") &&
               !design.nozzle.erosion.enabled;
-            if (hideErosionDetail) return null;
+            const hasPointDiameter = ["star", "wagon_wheel", "rod_tube"].includes(design.grain.type);
+            const hasPointCount = ["star", "wagon_wheel"].includes(design.grain.type);
+            const hideGrainField =
+              g === "grain" &&
+              ((f.id === "point_diameter" && !hasPointDiameter) ||
+                (f.id === "n_points" && !hasPointCount));
+            if (hideErosionDetail || hideGrainField) return null;
             return <FieldRow key={f.id} field={f} catalog={catalog} />;
           })}
           {g === "grain" && design.grain.type === "bates" && (

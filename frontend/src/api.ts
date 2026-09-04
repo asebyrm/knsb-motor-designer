@@ -39,8 +39,14 @@ export interface Catalog {
   schema_version: number;
   propellants: Array<{ id: string; file: string; name_tr: string; name_en: string }>;
   grains: string[];
-  case_materials: Array<{ id: string; name_tr: string; name_en: string; notes_key: string }>;
-  liner_materials: Array<{ id: string; name_tr: string; name_en: string; notes_key: string }>;
+  case_materials: Array<{
+    id: string; name_tr: string; name_en: string; notes_key: string;
+    properties: Record<string, number>;
+  }>;
+  liner_materials: Array<{
+    id: string; name_tr: string; name_en: string; notes_key: string;
+    properties: Record<string, number>;
+  }>;
   warning_codes: Array<{ code: string; level: string; i18n_key: string }>;
   all_warning_codes: string[];
   print_methods: string[];

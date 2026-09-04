@@ -17,6 +17,8 @@ export function defaultDesign(): DesignDoc {
       segment_length: 0.075,
       segment_count: 3,
       segment_spacing: 0.003,
+      point_diameter: 0.03,
+      n_points: 6,
     },
     nozzle: {
       throat_diameter: 0.0115,
@@ -25,6 +27,8 @@ export function defaultDesign(): DesignDoc {
       convergence_half_angle_deg: 45,
       efficiency: 0.95,
       throat_length: 0.006,
+      contour_type: "conic",
+      material_id: null,
       erosion: { enabled: false, coefficient_mm_s: 0.05, exponent: 0.8 },
     },
     case: {
@@ -65,10 +69,29 @@ export function getPath(obj: unknown, path: string): unknown {
 const LS_DESIGN = "knsb.design";
 const LS_TOKEN = "knsb.token";
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Deep-merges `saved` onto `base`, so a design saved before a field (grain.n_points,
+ * nozzle.contour_type, ...) existed still gets that field's default instead of
+ * `undefined` - a shallow `{...base, ...saved}` only merges top-level keys and would
+ * silently drop new nested fields for any pre-existing localStorage/saved design. */
+export function deepMerge<T>(base: T, saved: unknown): T {
+  if (!isPlainObject(saved) || !isPlainObject(base)) return (saved as T) ?? base;
+  const out: Record<string, unknown> = { ...base };
+  for (const [k, v] of Object.entries(saved)) {
+    out[k] = isPlainObject(v) && isPlainObject((base as Record<string, unknown>)[k])
+      ? deepMerge((base as Record<string, unknown>)[k], v)
+      : v;
+  }
+  return out as T;
+}
+
 function loadDesign(): DesignDoc {
   try {
     const raw = localStorage.getItem(LS_DESIGN);
-    if (raw) return { ...defaultDesign(), ...JSON.parse(raw) };
+    if (raw) return deepMerge(defaultDesign(), JSON.parse(raw));
   } catch {
     /* ignore */
   }
@@ -82,7 +105,6 @@ interface AppState {
   theme: "light" | "dark";
   webFraction: number;
   lastResult: SimResult | null;
-  tip: string | null;
   user: Record<string, unknown> | null;
   setField: (path: string, value: unknown) => void;
   setDesign: (d: DesignDoc) => void;
@@ -91,7 +113,6 @@ interface AppState {
   setTheme: (t: "light" | "dark") => void;
   setWebFraction: (f: number) => void;
   setLastResult: (r: SimResult | null) => void;
-  setTip: (t: string | null) => void;
   setUser: (u: Record<string, unknown> | null, token?: string | null) => void;
 }
 
@@ -103,7 +124,6 @@ export const useStore = create<AppState>((set, get) => ({
     (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
   webFraction: 0,
   lastResult: null,
-  tip: null,
   user: null,
   setField: (path, value) => {
     const design = clone(get().design);
@@ -130,7 +150,6 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setWebFraction: (webFraction) => set({ webFraction }),
   setLastResult: (lastResult) => set({ lastResult }),
-  setTip: (tip) => set({ tip }),
   setUser: (user, token) => {
     if (token !== undefined) {
       if (token) localStorage.setItem(LS_TOKEN, token);

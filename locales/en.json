@@ -16,6 +16,7 @@
     "units_imperial": "Imperial",
     "on": "On",
     "off": "Off",
+    "same_as_case": "(same as case)",
     "theme": "Theme",
     "language": "Language",
     "close": "Close",
@@ -29,6 +30,15 @@
     "cross_section": "Engine cross-section",
     "technical_report": "Technical report",
     "technical_report_hint": "Scaled, dimensioned drawing with editable inputs, the parts list (BOM) and downloadable files for your records.",
+    "nozzle_drawing": "Nozzle technical drawing",
+    "materials_tab": "Materials",
+    "materials_hint": "Every property the analysis actually reads for each selected material. Enter your own value if your sample differs from the catalog - it only affects this design.",
+    "materials_property": "Property",
+    "materials_catalog_value": "Catalog value",
+    "materials_your_value": "Your value",
+    "materials_reset": "Reset to catalog value",
+    "formulas_tab": "Formulas",
+    "formulas_hint": "Which formula this program uses for each stage of the calculation, in the platform's current state. This page is updated as the program develops - it may lag a recent change; the source (backend/core/) is always the final authority.",
     "results": "Results",
     "warnings": "Warnings",
     "no_warnings": "No warnings.",
@@ -77,6 +87,96 @@
     "view_schematic": "Schematic",
     "view_technical": "Technical"
   },
+  "materials": {
+    "prop": {
+      "density": "Density",
+      "tensile_strength": "Tensile strength",
+      "yield_strength": "Yield strength",
+      "elastic_modulus": "Elastic modulus",
+      "print_direction_factor": "Print-direction factor",
+      "thermal_conductivity": "Thermal conductivity",
+      "specific_heat": "Specific heat",
+      "glass_transition": "Glass transition / melt",
+      "max_service_temp": "Max service temperature",
+      "ablation_rate": "Ablation rate",
+      "min_thickness": "Recommended min. thickness",
+      "max_interface_temp": "Max interface temperature"
+    }
+  },
+  "formulas": {
+    "group": {
+      "grain": "Grain burn area",
+      "ballistics": "Internal ballistics",
+      "nozzle": "Nozzle",
+      "structural": "Structural (factor of safety)",
+      "thermal": "Thermal / liner",
+      "mission": "Flight / altitude estimate"
+    },
+    "burn_area_bates": {
+      "title": "BATES burn area",
+      "desc": "Core radius grows with the burnt web x; each segment's exposed length shrinks as its two end faces burn back too."
+    },
+    "burn_area_tubular": {
+      "title": "Tubular burn area",
+      "desc": "Only the core grows; the ends and OD are inhibited. Burn area rises monotonically, so this geometry is always progressive."
+    },
+    "burn_area_rod_tube": {
+      "title": "Rod-and-tube burn area",
+      "desc": "The rod's own surface shrinks while the tube's bore grows, toward each other - the two roughly offset, which is what makes the curve read as close to flat."
+    },
+    "burn_area_star_wagon": {
+      "title": "Star / wagon-wheel burn area",
+      "desc": "These shapes change topology as they burn (points round off, valleys merge), so there is no simple formula - the bore is grown as an exact 2D polygon offset instead of a hand-derived equation."
+    },
+    "kn": {
+      "title": "Klemmung",
+      "desc": "The ratio that drives chamber pressure: more burning surface relative to the throat means higher pressure."
+    },
+    "burn_rate": {
+      "title": "Burn rate (Saint-Robert / Vieille's law)",
+      "desc": "Propellant-specific (a, n) coefficients, tabulated per pressure band in each propellant's YAML file."
+    },
+    "equilibrium_pressure": {
+      "title": "Equilibrium chamber pressure",
+      "desc": "Solved from the mass balance between propellant generation and nozzle mass flow, per pressure band; a robust root-finder is the fallback when no band is self-consistent."
+    },
+    "ballistics_march": {
+      "title": "Time-march sequence",
+      "desc": "The order every timestep is computed in, from burn area through to integrated impulse, plus the post-burnout tail-off."
+    },
+    "lstar": {
+      "title": "Characteristic length L*",
+      "desc": "A combustion-efficiency proxy: chamber volume available per unit of throat area at ignition."
+    },
+    "thrust_coefficient": {
+      "title": "Thrust coefficient and thrust",
+      "desc": "The ideal gas-dynamic coefficient, knocked down by divergence angle (halved for a \"bell\" contour) and the nozzle efficiency factor."
+    },
+    "specific_impulse": {
+      "title": "Specific impulse",
+      "desc": "Total impulse divided by propellant weight - the standard efficiency figure for comparing motors."
+    },
+    "erosion": {
+      "title": "Throat erosion",
+      "desc": "Optional and off by default. Widens the throat over the burn, which only ever lowers pressure - never a way to raise MEOP."
+    },
+    "fos_thin": {
+      "title": "Factor of safety - thin wall",
+      "desc": "Used when the wall is thin relative to the bore radius. Von Mises stress from the hoop and axial components, against the print-direction-derated tensile strength."
+    },
+    "fos_thick": {
+      "title": "Factor of safety - thick wall (Lamé)",
+      "desc": "Used for a thick wall, evaluated where hoop stress peaks (the bore). The minimum accepted FoS is 2.0; export locks below that."
+    },
+    "thermal_soak": {
+      "title": "Liner thermal soak",
+      "desc": "Estimates the case's inner-surface temperature after the burn from the liner's thickness and thermal diffusivity, against the case material's service-temperature limit."
+    },
+    "flight": {
+      "title": "1-DOF vertical flight",
+      "desc": "A simplified apogee estimate only - not a stability-aware, 6-DOF flight simulator. Export to OpenRocket/RockSim for real flight verification."
+    }
+  },
   "nav": {
     "designer": "Designer",
     "mission": "Quick altitude estimate",
@@ -103,15 +203,19 @@
     "grain_type": "Grain geometry",
     "outer_diameter": "Grain outer Ø",
     "core_diameter": "Core Ø",
+    "point_diameter": "Point/slot Ø",
+    "n_points": "Point/slot count",
     "segment_length": "Segment length",
     "segment_count": "Segment count",
     "segment_spacing": "Inter-segment gap",
     "throat_diameter": "Throat Ø",
     "expansion_ratio": "Expansion ratio (Ae/At)",
+    "contour_type": "Nozzle contour",
     "divergence_half_angle": "Divergent half-angle",
     "convergence_half_angle": "Convergent half-angle",
     "nozzle_efficiency": "Nozzle efficiency",
     "throat_length": "Throat length",
+    "nozzle_material": "Nozzle material",
     "erosion_enabled": "Model throat erosion",
     "erosion_coefficient": "Erosion coefficient K",
     "erosion_exponent": "Erosion exponent m",
@@ -146,18 +250,22 @@
       "propellant_id": "The sugar propellant formulation. KNSB is potassium nitrate / sorbitol; changing it changes burn rate, c* and flame temperature.",
       "density_factor": "How close your cast grain gets to the ideal density. 0.95 is typical for hand-poured KNSB; lower it if your grains have voids.",
       "c_star_efficiency": "Real performance versus the theoretical value. If you have not static-fired, 0.90–0.95 is a reasonable estimate.",
-      "grain_type": "How the propellant burns. BATES is neutral and recommended; a tube is progressive and pushes pressure up during the burn.",
+      "grain_type": "How the propellant burns. BATES is neutral and recommended; a tube is progressive and pushes pressure up during the burn; star and wagon-wheel start high and taper off; rod-and-tube can be tuned close to flat by balancing the rod and tube webs.",
       "outer_diameter": "Outside diameter of the propellant grain. It has to fit inside the liner, and it sets how much propellant you have.",
-      "core_diameter": "Diameter of the central bore. A wider core lowers pressure and thrust but shortens burn time.",
+      "core_diameter": "Diameter of the central bore (star: the root/valley diameter; wagon-wheel: the hub diameter; rod-and-tube: the rod diameter). A wider core lowers pressure and thrust but shortens burn time.",
+      "point_diameter": "Star/wagon-wheel: diameter reached by the point tips or slot tips. Rod-and-tube: the tube's own inner bore diameter. Must sit between the core diameter and the grain OD.",
+      "n_points": "Number of star points or wagon-wheel slots.",
       "segment_length": "Length of one BATES segment. Use “Make neutral” to get the length that keeps burn area constant.",
       "segment_count": "Number of BATES segments stacked in the case. More segments means more burn area and higher thrust.",
       "segment_spacing": "Small gap left between segments for the spacers/retainers. It barely affects ballistics, only the total stack length.",
       "throat_diameter": "The narrowest point of the nozzle. Making it smaller raises chamber pressure and thrust; too small and the case can burst.",
       "expansion_ratio": "Exit area divided by throat area. Use “Optimum expansion” to match sea level; too large and the flow separates.",
+      "contour_type": "Conic: a straight-walled cone at the divergent half-angle below. Bell: an approximated contoured (Rao-style) nozzle, shorter and slightly more efficient for the same expansion ratio.",
       "divergence_half_angle": "Cone angle of the diverging section. 12–15° is normal; larger angles lose thrust to divergence.",
       "convergence_half_angle": "Cone angle feeding into the throat. It only affects the nozzle length, not performance; 30–45° is typical.",
       "nozzle_efficiency": "Lump factor for friction and non-ideal flow in the nozzle. 0.95 is a common default.",
       "throat_length": "Length of the straight throat section. Mostly a manufacturing choice; keep it short.",
+      "nozzle_material": "The nozzle's own material, for its mass and the technical drawing. Leave on “same as case” unless you are machining it from something else.",
       "erosion_enabled": "Whether the throat is allowed to widen during the burn. Leave off unless you have measured erosion — it is never a way to “fix” over-pressure.",
       "erosion_coefficient": "Recession rate constant for the graphite throat. Realistic values are 0.02–0.1 mm/s; above 0.3 the model warns you.",
       "erosion_exponent": "Pressure sensitivity of throat erosion. 0.8 is a common value.",
@@ -193,6 +301,7 @@
       "peak_thrust": "The highest instantaneous thrust during the burn.",
       "burn_time": "Time from ignition to when thrust drops back to 5 % of the peak.",
       "peak_pressure": "Highest chamber pressure on the erosionless curve. This is what the case must survive (MEOP).",
+      "peak_pressure_eroded": "Highest chamber pressure with throat erosion applied - the throat opening up over the burn lowers this below the erosionless value above. Structural safety is still judged against the erosionless peak.",
       "meop": "The pressure limit you told the program your case can take. If peak pressure exceeds it, export is locked until you accept the risk.",
       "specific_impulse": "Impulse per unit weight of propellant burned — an efficiency number, in seconds.",
       "propellant_mass": "Mass of propellant actually consumed.",
@@ -284,7 +393,23 @@
         "No recovery, descent or staging"
       ]
     },
-    "warning_generic": "Review the highlighted item."
+    "warning_generic": "Review the highlighted item.",
+    "materials": {
+      "prop": {
+        "density": "Mass per unit volume - sets every part's mass, and the liner/case thermal soak.",
+        "tensile_strength": "Ultimate strength before fracture. Multiplied by the print-direction factor (or the print method's, if set) to get the allowable stress behind the factor of safety.",
+        "yield_strength": "Where the material stops behaving elastically. Falls back to 90% of tensile strength if the catalog doesn't list it separately.",
+        "elastic_modulus": "Young's modulus - stiffness, used by the thick-wall (Lamé) stress model.",
+        "print_direction_factor": "Baseline knock-down for load normal to the print layers, before the chosen print method's own factor (FDM 0.5, SLS 0.9) overrides it.",
+        "thermal_conductivity": "k - how fast heat moves through the material, used in the case/liner thermal-soak estimate.",
+        "specific_heat": "How much energy it takes to raise a kilogram of it by 1 K, used in the same thermal-soak estimate.",
+        "glass_transition": "Softening point for a polymer, melting point for a metal.",
+        "max_service_temp": "The continuous-use temperature limit the thermal check compares against.",
+        "ablation_rate": "How fast the liner's exposed surface recedes at KNSB flame conditions - drives the recommended minimum thickness for your burn time.",
+        "min_thickness": "Baseline liner thickness recommendation before the burn-time ablation allowance is added.",
+        "max_interface_temp": "The temperature the liner's outer face (against the case) should stay under."
+      }
+    }
   },
   "metric": {
     "total_impulse": "Total impulse",
@@ -292,6 +417,7 @@
     "peak_thrust": "Peak thrust",
     "burn_time": "Burn time",
     "peak_pressure": "Peak pressure (no erosion)",
+    "peak_pressure_eroded": "Peak pressure (with erosion)",
     "meop": "MEOP (case limit)",
     "specific_impulse": "Specific impulse",
     "propellant_mass": "Propellant mass",

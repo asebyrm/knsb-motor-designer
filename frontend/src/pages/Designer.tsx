@@ -5,7 +5,9 @@ import { useTranslation } from "react-i18next";
 import { api, type Catalog } from "../api";
 import { Charts } from "../components/Charts";
 import { EngineCrossSection } from "../components/EngineCrossSection";
+import { FormulasPanel } from "../components/FormulasPanel";
 import { LiveCrossSections } from "../components/LiveCrossSections";
+import { MaterialsPanel } from "../components/MaterialsPanel";
 import { MissionPanel } from "../components/MissionPanel";
 import { ParamPanel } from "../components/ParamPanel";
 import { ResultsPanel } from "../components/ResultsPanel";
@@ -25,7 +27,7 @@ function useDebounced<T>(value: T, ms: number): T {
 export function Designer({ catalog }: { catalog: Catalog | undefined }) {
   const { t } = useTranslation();
   const { design, setField, webFraction, setWebFraction } = useStore();
-  const [tab, setTab] = useState<"curves" | "cross_section">("curves");
+  const [tab, setTab] = useState<"curves" | "cross_section" | "materials" | "formulas">("curves");
 
   const setLastResult = useStore((s) => s.setLastResult);
   const debounced = useDebounced(JSON.stringify(design), 300);
@@ -70,9 +72,11 @@ export function Designer({ catalog }: { catalog: Catalog | undefined }) {
             tabs={[
               { id: "curves", label: t("ui.curves") },
               { id: "cross_section", label: t("ui.technical_report") },
+              { id: "materials", label: t("ui.materials_tab") },
+              { id: "formulas", label: t("ui.formulas_tab") },
             ]}
             active={tab}
-            onChange={(id) => setTab(id as "curves" | "cross_section")}
+            onChange={(id) => setTab(id as "curves" | "cross_section" | "materials" | "formulas")}
           />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
@@ -96,8 +100,12 @@ export function Designer({ catalog }: { catalog: Catalog | undefined }) {
               </div>
               <LiveCrossSections result={result} />
             </div>
-          ) : (
+          ) : tab === "cross_section" ? (
             <EngineCrossSection result={result} />
+          ) : tab === "materials" ? (
+            <MaterialsPanel catalog={catalog} />
+          ) : (
+            <FormulasPanel />
           )}
         </div>
         {sim.isFetching && (

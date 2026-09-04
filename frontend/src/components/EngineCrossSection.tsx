@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api, ApiError } from "../api";
-import { linerColor } from "../lib/drawing";
+import { linerColor, PART_FIT_CODES } from "../lib/drawing";
 import { clampForUnit, CONV, isNonNegativeUnit } from "../lib/units";
 import { useStore } from "../store";
 import type { DesignDoc, SimResult } from "../types";
@@ -24,6 +24,9 @@ const deg = (d: number) => (d * Math.PI) / 180;
 
 function webThickness(g: DesignDoc["grain"]): number {
   if (g.type === "endburner") return g.segment_length;
+  if (g.type === "rod_tube")
+    return Math.max(g.core_diameter / 2, (g.outer_diameter - g.point_diameter) / 2);
+  if (g.type === "star" || g.type === "wagon_wheel") return (g.outer_diameter - g.core_diameter) / 2;
   const radial = (g.outer_diameter - g.core_diameter) / 2;
   if (g.type === "tubular") return radial;
   return Math.min(radial, g.segment_length / 2);
@@ -32,6 +35,55 @@ function webThickness(g: DesignDoc["grain"]): number {
 function burntCoreDia(g: DesignDoc["grain"], frac: number): number {
   if (g.type === "endburner") return 0;
   return g.core_diameter + 2 * frac * webThickness(g);
+}
+
+/** Matches the backend's own default (core/grains/wagon_wheel.py) - the two only
+ * ever disagree if a design sets an explicit slot_half_angle_deg, which isn't
+ * exposed in the UI, so this schematic-preview approximation always matches. */
+function wagonWheelSlotHalfAngleDeg(nPoints: number): number {
+  return Math.min(15, (0.35 * 180) / nPoints);
+}
+
+/** Points for the star bore polygon (SVG px coords), growing linearly with the
+ * burnt web - the same simplified preview model core/grains/star.py's own
+ * cross_section_svg uses (the real physics uses an exact polygon offset; this is
+ * only ever a schematic drawing). */
+function starPolygonPoints(g: DesignDoc["grain"], frac: number, k: number, c: number): string {
+  const webNow = frac * webThickness(g);
+  const rMax = g.outer_diameter / 2;
+  const pts: string[] = [];
+  for (let i = 0; i < 2 * g.n_points; i++) {
+    const base = i % 2 === 0 ? g.point_diameter / 2 : g.core_diameter / 2;
+    const r = Math.min(base + webNow, rMax) * k;
+    const theta = (Math.PI * i) / g.n_points;
+    pts.push(`${c + r * Math.cos(theta)},${c + r * Math.sin(theta)}`);
+  }
+  return pts.join(" ");
+}
+
+interface WagonWheelSlot {
+  hx1: number; hy1: number; hx2: number; hy2: number;
+  tx1: number; ty1: number; tx2: number; ty2: number;
+}
+
+function wagonWheelSlots(g: DesignDoc["grain"], frac: number, k: number,
+  c: number): { hubR: number; slots: WagonWheelSlot[] } {
+  const webNow = frac * webThickness(g);
+  const rMax = g.outer_diameter / 2;
+  const rHub = Math.min(g.core_diameter / 2 + webNow, rMax);
+  const rTip = Math.min(g.point_diameter / 2 + webNow, rMax);
+  const half = (Math.PI / 180) * wagonWheelSlotHalfAngleDeg(g.n_points);
+  const slots: WagonWheelSlot[] = [];
+  for (let i = 0; i < g.n_points; i++) {
+    const center = (2 * Math.PI * i) / g.n_points;
+    slots.push({
+      hx1: c + rHub * k * Math.cos(center - half), hy1: c + rHub * k * Math.sin(center - half),
+      hx2: c + rHub * k * Math.cos(center + half), hy2: c + rHub * k * Math.sin(center + half),
+      tx1: c + rTip * k * Math.cos(center - half), ty1: c + rTip * k * Math.sin(center - half),
+      tx2: c + rTip * k * Math.cos(center + half), ty2: c + rTip * k * Math.sin(center + half),
+    });
+  }
+  return { hubR: rHub * k, slots };
 }
 
 export function EngineCrossSection({ result }: { result: SimResult | undefined }) {
@@ -44,6 +96,8 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
   const g = design.grain;
   const noz = design.nozzle;
   const linerT = design.liner?.thickness ?? 0;
+  const fitCodes = new Set((result?.assembly.fit_warnings ?? []).map((w) => w.code));
+  const badPart = (name: string) => (PART_FIT_CODES[name] ?? []).some((c) => fitCodes.has(c));
 
   const dims: DimRow[] = [
     { id: "grain_od", label: t("param.outer_diameter"), path: "grain.outer_diameter", unit: "length_mm", value: g.outer_diameter },
@@ -95,6 +149,13 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
             {pdfBusy ? t("ui.recalculating") : t("ui.download_pdf_report")}
           </button>
           {pdfError && <p className="mt-1 max-w-xs text-xs text-danger">{pdfError}</p>}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-1 text-sm font-semibold">{t("ui.nozzle_drawing")}</h3>
+        <div className="overflow-x-auto rounded-lg border border-border bg-surface p-2">
+          <NozzleTechnicalSVG design={design} badPart={badPart} />
         </div>
       </div>
 
@@ -196,9 +257,19 @@ export function LongitudinalSVG({
   // --- geometry (mm) --------------------------------------------------------
   const rCaseO = (case_?.outer_diameter_mm ?? g.outer_diameter * 1000 + 12) / 2;
   const rCaseI = (case_?.inner_diameter_mm ?? g.outer_diameter * 1000 + 2) / 2;
-  const rBore0 = (g.core_diameter * 1000) / 2;
-  const rBoreNow = (burntCoreDia(g, layers.burnt ? webFraction : 0) * 1000) / 2;
   const rGrainO = (g.outer_diameter * 1000) / 2;
+  // rod_tube's "core_diameter" is the rod's own (shrinking) OD, not a growing bore
+  // like every other type - the actual open flow area is the tube's (growing) bore,
+  // whose initial diameter is point_diameter. Handled separately below.
+  const isRodTube = g.type === "rod_tube";
+  const rBore0 = isRodTube ? (g.point_diameter * 1000) / 2 : (g.core_diameter * 1000) / 2;
+  const rBoreNow = isRodTube
+    ? Math.min(rBore0 + (layers.burnt ? webFraction : 0) * webThickness(g) * 1000, rGrainO)
+    : (burntCoreDia(g, layers.burnt ? webFraction : 0) * 1000) / 2;
+  const rRod0 = isRodTube ? (g.core_diameter * 1000) / 2 : 0;
+  const rRodNow = isRodTube
+    ? Math.max(rRod0 - (layers.burnt ? webFraction : 0) * webThickness(g) * 1000, 0)
+    : 0;
 
   const rT = (nz.throat_diameter * 1000) / 2;
   const rE = rT * Math.sqrt(nz.expansion_ratio);
@@ -295,21 +366,32 @@ export function LongitudinalSVG({
     }
   }
 
-  // propellant grain (green) with the burnt zone (grey) and the dark cavity
+  // propellant grain (green) with the burnt zone (grey) and the dark cavity.
+  // Each segment's un-burned axial extent [xaNow, xbNow] is computed once here and
+  // reused by the flame-front lines below, so both stay in sync.
   const n = g.type === "endburner" ? 1 : Math.max(1, g.segment_count);
-  const gapMm = g.type === "bates" ? g.segment_spacing * 1000 : 0;
-  const segMm = g.type === "bates" ? g.segment_length * 1000 : gx1 - gx0;
-  for (let i = 0; i < n; i++) {
+  const gapMm = g.type === "endburner" ? 0 : g.segment_spacing * 1000;
+  const segMm = g.type === "endburner" ? gx1 - gx0 : g.segment_length * 1000;
+  // BATES burns from both exposed end faces as well as the core (tubular and
+  // endburner ends are inhibited), symmetrically - the burned web equals the
+  // radial growth already computed for the bore.
+  const burnedWebMm = g.type === "bates" ? Math.max(rBoreNow - rBore0, 0) : 0;
+  const segments = Array.from({ length: n }, (_, i) => {
     const xa = gx0 + i * (segMm + gapMm);
     const xb = Math.min(xa + segMm, gx1);
+    const mid = (xa + xb) / 2;
+    return { xaNow: Math.min(xa + burnedWebMm, mid), xbNow: Math.max(xb - burnedWebMm, mid) };
+  });
+  segments.forEach(({ xaNow, xbNow }, i) => {
+    if (xbNow <= xaNow + 1e-6) return; // this segment has burnt through axially
     const rInner = g.type === "endburner" ? 0 : rBoreNow;
     const rInner0 = g.type === "endburner" ? 0 : rBore0;
-    const w = (xb - xa) * scale;
+    const w = (xbNow - xaNow) * scale;
     // green propellant remaining
     for (const sign of [-1, 1]) {
       const yA = sign < 0 ? yUp(rGrainO) : yDn(rInner);
       els.push(
-        <rect key={`prop-${i}-${sign}`} x={sx(xa)} y={yA} width={w} height={(rGrainO - rInner) * scale}
+        <rect key={`prop-${i}-${sign}`} x={sx(xaNow)} y={yA} width={w} height={(rGrainO - rInner) * scale}
           fill="var(--propellant)" stroke={grainStroke} strokeWidth={1}>
           <title>{`${t("drawing.propellant")} · ${design.propellant.id}`}</title>
         </rect>,
@@ -318,77 +400,139 @@ export function LongitudinalSVG({
       if (layers.burnt && rInner > rInner0 + 0.01) {
         const yB = sign < 0 ? yUp(rInner) : yDn(rInner0);
         els.push(
-          <rect key={`burnt-${i}-${sign}`} x={sx(xa)} y={yB} width={w}
+          <rect key={`burnt-${i}-${sign}`} x={sx(xaNow)} y={yB} width={w}
             height={(rInner - rInner0) * scale} fill="var(--burnt-zone)" opacity={0.55} />,
         );
       }
     }
-  }
-
-  // nozzle metal (grey) — smooth converging-diverging bell drawn as a solid shell
-  const wallT = Math.max(rT * 0.7, 4);
-  const wallE = Math.max(rE * 0.4, 4);
-  const cLen = pThroat - nx; // convergent length
-  const dLen = pExit - pThroat; // divergent length
-  const bell = (yy: (r: number) => number) =>
-    // outer: hug the case OD briefly, curve down to the throat, then flare (bell)
-    `M ${sx(nx)} ${yy(rCaseO)} ` +
-    `L ${sx(nx + cLen * 0.3)} ${yy(rCaseO * 0.94)} ` +
-    `Q ${sx(pThroat - cLen * 0.2)} ${yy(rT + wallT)} ${sx(pThroat)} ${yy(rT + wallT)} ` +
-    `C ${sx(pThroat + dLen * 0.3)} ${yy(rT + wallT)} ${sx(pExit - dLen * 0.15)} ${yy(rE + wallE)} ` +
-    `${sx(pExit)} ${yy(rE + wallE)} ` +
-    // exit lip down to the flow surface
-    `L ${sx(pExit)} ${yy(rE)} ` +
-    // inner: divergent cone back to the throat, then convergent curve to the chamber bore
-    `C ${sx(pExit - dLen * 0.15)} ${yy(rE)} ${sx(pThroat + dLen * 0.3)} ${yy(rT)} ${sx(pThroat)} ${yy(rT)} ` +
-    `Q ${sx(nx + cLen * 0.35)} ${yy(rCaseI * 0.9)} ${sx(nx)} ${yy(rCaseI)} Z`;
-  els.push(
-    <path key="noz-top" d={bell(yUp)} fill="var(--nozzle-metal)" stroke={nozStroke} strokeWidth={1.4}>
-      <title>{t("drawing.nozzle")}</title>
-    </path>,
-    <path key="noz-bot" d={bell(yDn)} fill="var(--nozzle-metal)" stroke={nozStroke} strokeWidth={1.4} />,
-  );
-
-  // combustion-chamber cavity (dark) — bore through the grain and the nozzle flow path,
-  // drawn ON TOP of the nozzle so the flow channel reads as an opening
-  const rCav = rBoreNow || rT;
-  els.push(
-    <path key="cavity"
-      d={`M ${sx(bhX)} ${yUp(rCav)} L ${sx(nx)} ${yUp(rCav)} ` +
-         `Q ${sx(nx + cLen * 0.35)} ${yUp(rCav)} ${sx(pThroat)} ${yUp(rT)} ` +
-         `C ${sx(pThroat + dLen * 0.3)} ${yUp(rT)} ${sx(pExit - dLen * 0.15)} ${yUp(rE)} ` +
-         `${sx(pExit)} ${yUp(rE)} ` +
-         `L ${sx(pExit)} ${yDn(rE)} ` +
-         `C ${sx(pExit - dLen * 0.15)} ${yDn(rE)} ${sx(pThroat + dLen * 0.3)} ${yDn(rT)} ` +
-         `${sx(pThroat)} ${yDn(rT)} ` +
-         `Q ${sx(nx + cLen * 0.35)} ${yDn(rCav)} ${sx(nx)} ${yDn(rCav)} L ${sx(bhX)} ${yDn(rCav)} Z`}
-      fill="var(--cavity)" />,
-  );
-
-  // flame front (yellow) — the burning surfaces
-  if (g.type !== "endburner") {
-    for (const sign of [-1, 1]) {
-      const y = sign < 0 ? yUp(rBoreNow) : yDn(rBoreNow);
-      els.push(
-        <line key={`flame-core-${sign}`} x1={sx(gx0)} y1={y} x2={sx(gx1)} y2={y}
-          stroke="var(--flame)" strokeWidth={2.5} />,
-      );
-    }
-    // segment end faces
-    if (g.type === "bates") {
-      for (let i = 0; i < n; i++) {
-        const xa = gx0 + i * (segMm + gapMm);
-        const xb = Math.min(xa + segMm, gx1);
-        for (const xf of [xa, xb]) {
+    // rod_tube: the free rod remaining in the middle of the tube's open bore
+    if (isRodTube && rRodNow > 0) {
+      for (const sign of [-1, 1]) {
+        els.push(
+          <rect key={`rod-${i}-${sign}`} x={sx(xaNow)}
+            y={sign < 0 ? yUp(rRodNow) : axisY} width={w} height={rRodNow * scale}
+            fill="var(--propellant)" stroke={grainStroke} strokeWidth={1}>
+            <title>{`${t("drawing.propellant")} · ${design.propellant.id} (rod)`}</title>
+          </rect>,
+        );
+      }
+      if (layers.burnt && rRodNow < rRod0 - 0.01) {
+        for (const sign of [-1, 1]) {
           els.push(
-            <line key={`flame-face-${i}-${xf}`} x1={sx(xf)} y1={yUp(rBoreNow)} x2={sx(xf)}
-              y2={yUp(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
-            <line key={`flame-faceb-${i}-${xf}`} x1={sx(xf)} y1={yDn(rBoreNow)} x2={sx(xf)}
-              y2={yDn(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
+            <rect key={`rod-burnt-${i}-${sign}`} x={sx(xaNow)}
+              y={sign < 0 ? yUp(rRod0) : yDn(rRodNow)} width={w}
+              height={(rRod0 - rRodNow) * scale} fill="var(--burnt-zone)" opacity={0.55} />,
           );
         }
       }
     }
+  });
+
+  // nozzle metal (grey) — smooth converging-diverging bell drawn as a solid shell
+  const wallT = Math.max(rT * 0.7, 4);
+  const wallE = Math.max(rE * 0.4, 4);
+  const cLen = pConv - nx; // convergent length
+  const dLen = pExit - pThroat; // divergent length
+  // "conic" divergent walls are straight lines at the given half-angle; "bell"
+  // walls are drawn as the same smooth curve as the convergent side (Section 5.3 -
+  // an approximated, shortened Rao-style contour, not a straight cone)
+  const isBell = nz.contour_type === "bell";
+  const divOuter = (yy: (r: number) => number) =>
+    isBell
+      ? `C ${sx(pThroat + dLen * 0.3)} ${yy(rT + wallT)} ${sx(pExit - dLen * 0.15)} ${yy(rE + wallE)} ` +
+        `${sx(pExit)} ${yy(rE + wallE)} `
+      : `L ${sx(pExit)} ${yy(rE + wallE)} `;
+  const divInner = (yy: (r: number) => number) =>
+    isBell
+      ? `C ${sx(pExit - dLen * 0.15)} ${yy(rE)} ${sx(pThroat + dLen * 0.3)} ${yy(rT)} ${sx(pThroat)} ${yy(rT)} `
+      : `L ${sx(pThroat)} ${yy(rT)} `;
+  const bell = (yy: (r: number) => number) =>
+    // outer: hug the case OD briefly, curve down to the throat, then flare
+    `M ${sx(nx)} ${yy(rCaseO)} ` +
+    `L ${sx(nx + cLen * 0.3)} ${yy(rCaseO * 0.94)} ` +
+    `Q ${sx(pConv - cLen * 0.2)} ${yy(rT + wallT)} ${sx(pConv)} ${yy(rT + wallT)} ` +
+    // straight throat land - its length is the throat_length parameter, drawn to scale
+    `L ${sx(pThroat)} ${yy(rT + wallT)} ` +
+    `${divOuter(yy)}` +
+    // exit lip down to the flow surface
+    `L ${sx(pExit)} ${yy(rE)} ` +
+    // inner: divergent section back to the throat land, straight through it, then
+    // convergent curve back to the chamber bore
+    `${divInner(yy)}` +
+    `L ${sx(pConv)} ${yy(rT)} ` +
+    `Q ${sx(nx + cLen * 0.35)} ${yy(rCaseI * 0.9)} ${sx(nx)} ${yy(rCaseI)} Z`;
+  els.push(
+    // drawn as part of the case (Section 10.1) - same solid-black treatment,
+    // regardless of which material is actually selected for it
+    <path key="noz-top" d={bell(yUp)} fill="var(--case-color)" stroke={nozStroke} strokeWidth={1.4}>
+      <title>{t("drawing.nozzle")}</title>
+    </path>,
+    <path key="noz-bot" d={bell(yDn)} fill="var(--case-color)" stroke={nozStroke} strokeWidth={1.4} />,
+  );
+
+  // nozzle flow-passage cavity (dark) — carves the flow channel out of the solid
+  // nozzle bell fill. The chamber bore itself is left unfilled (background shows
+  // through) so the solid-black case wall reads as a clean, unambiguous outline
+  // instead of blending into an equally dark chamber interior.
+  const rCav = rBoreNow || rT;
+  // throat -> exit and back, straight for "conic", curved for "bell" (matches the
+  // nozzle bell's own divInner/divOuter above)
+  const divFlowOut = (yy: (r: number) => number) =>
+    isBell
+      ? `C ${sx(pThroat + dLen * 0.3)} ${yy(rT)} ${sx(pExit - dLen * 0.15)} ${yy(rE)} ${sx(pExit)} ${yy(rE)} `
+      : `L ${sx(pExit)} ${yy(rE)} `;
+  const divFlowBack = (yy: (r: number) => number) =>
+    isBell
+      ? `C ${sx(pExit - dLen * 0.15)} ${yy(rE)} ${sx(pThroat + dLen * 0.3)} ${yy(rT)} ${sx(pThroat)} ${yy(rT)} `
+      : `L ${sx(pThroat)} ${yy(rT)} `;
+  els.push(
+    <path key="cavity"
+      d={`M ${sx(nx)} ${yUp(rCav)} ` +
+         `Q ${sx(nx + cLen * 0.35)} ${yUp(rCav)} ${sx(pConv)} ${yUp(rT)} ` +
+         `L ${sx(pThroat)} ${yUp(rT)} ` +
+         `${divFlowOut(yUp)}` +
+         `L ${sx(pExit)} ${yDn(rE)} ` +
+         `${divFlowBack(yDn)}` +
+         `L ${sx(pConv)} ${yDn(rT)} ` +
+         `Q ${sx(nx + cLen * 0.35)} ${yDn(rCav)} ${sx(nx)} ${yDn(rCav)} Z`}
+      fill="var(--cavity)" />,
+  );
+
+  // flame front (yellow) — the burning surfaces, drawn per segment so it stops at
+  // each segment's actual (possibly burnt-through) extent rather than bridging gaps
+  if (g.type !== "endburner") {
+    segments.forEach(({ xaNow, xbNow }, i) => {
+      if (xbNow <= xaNow + 1e-6) return; // burnt through, no surface left
+      for (const sign of [-1, 1]) {
+        const y = sign < 0 ? yUp(rBoreNow) : yDn(rBoreNow);
+        els.push(
+          <line key={`flame-core-${i}-${sign}`} x1={sx(xaNow)} y1={y} x2={sx(xbNow)} y2={y}
+            stroke="var(--flame)" strokeWidth={2.5} />,
+        );
+      }
+      // rod_tube: the rod's own outer surface burns too
+      if (isRodTube && rRodNow > 0) {
+        for (const sign of [-1, 1]) {
+          const y = sign < 0 ? yUp(rRodNow) : yDn(rRodNow);
+          els.push(
+            <line key={`flame-rod-${i}-${sign}`} x1={sx(xaNow)} y1={y} x2={sx(xbNow)} y2={y}
+              stroke="var(--flame)" strokeWidth={2} />,
+          );
+        }
+      }
+      // segment end faces — only BATES burns from the ends; the faces visibly
+      // retreat inward together with the propellant rect above
+      if (g.type === "bates") {
+        for (const xf of [xaNow, xbNow]) {
+          els.push(
+            <line key={`flame-face-${i}-${xf === xaNow ? "a" : "b"}-top`} x1={sx(xf)} y1={yUp(rBoreNow)}
+              x2={sx(xf)} y2={yUp(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
+            <line key={`flame-face-${i}-${xf === xaNow ? "a" : "b"}-bot`} x1={sx(xf)} y1={yDn(rBoreNow)}
+              x2={sx(xf)} y2={yDn(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
+          );
+        }
+      }
+    });
   } else {
     // end-burner: a transverse flame face that recedes
     const xf = gx0 + webFraction * (gx1 - gx0);
@@ -461,6 +605,8 @@ export function LongitudinalSVG({
         label={`L_total ${(x1 - x0).toFixed(1)} mm`} derived />,
       <DimLine key="dmax" x1={sx(pExit) + 24} x2={sx(pExit) + 24} y={yUp(rCaseO)} y2={yDn(rCaseO)}
         vertical label={`D ${(rCaseO * 2).toFixed(1)} mm`} />,
+      <DimLine key="lthroat" x1={sx(pConv)} x2={sx(pThroat)} y={yDn(rT + wallT) + 16}
+        label={`L_t ${(pThroat - pConv).toFixed(1)} mm`} derived />,
     );
   }
 
@@ -504,6 +650,62 @@ export function TransverseSVG({
     <circle cx={c} cy={c} r={r * k} fill={fill} stroke={s} strokeWidth={sw} strokeDasharray={dash} />
   );
   const caseS = badPart("case") ? "var(--error)" : "currentColor";
+  const flameS = badPart("grain") ? "var(--error)" : "var(--flame)";
+
+  const shaped = g.type === "star" || g.type === "wagon_wheel" || g.type === "rod_tube";
+  let bore: React.ReactNode = null;
+  if (g.type !== "endburner" && !shaped) {
+    bore = (
+      <>
+        {rCore > rCoreInit + 1e-9 && ring(rCore, "var(--burnt-zone)", "none")}
+        {rCore > 0 && ring(rCore, "var(--cavity)", "none")}
+        <circle cx={c} cy={c} r={rCore * k} fill="none" stroke={flameS} strokeWidth={2.5} />
+        {rCore > rCoreInit + 1e-9 && ring(rCoreInit, "none", "var(--dim-derived)", 1, "2 2")}
+      </>
+    );
+  } else if (g.type === "star") {
+    bore = (
+      <>
+        <polygon points={starPolygonPoints(g, webFraction, k, c)} fill="var(--cavity)"
+          stroke={flameS} strokeWidth={2} />
+        <polygon points={starPolygonPoints(g, 0, k, c)} fill="none"
+          stroke="var(--dim-derived)" strokeWidth={1} strokeDasharray="2 2" />
+      </>
+    );
+  } else if (g.type === "wagon_wheel") {
+    const { hubR, slots } = wagonWheelSlots(g, webFraction, k, c);
+    const { hubR: hubR0, slots: slots0 } = wagonWheelSlots(g, 0, k, c);
+    bore = (
+      <>
+        <circle cx={c} cy={c} r={hubR} fill="var(--cavity)" stroke={flameS} strokeWidth={2} />
+        {slots.map((s, i) => (
+          <polygon key={i} fill="var(--cavity)" stroke={flameS} strokeWidth={2}
+            points={`${s.hx1},${s.hy1} ${s.tx1},${s.ty1} ${s.tx2},${s.ty2} ${s.hx2},${s.hy2}`} />
+        ))}
+        <circle cx={c} cy={c} r={hubR0} fill="none" stroke="var(--dim-derived)" strokeWidth={1}
+          strokeDasharray="2 2" />
+        {slots0.map((s, i) => (
+          <polygon key={`i0-${i}`} fill="none" stroke="var(--dim-derived)" strokeWidth={1}
+            strokeDasharray="2 2"
+            points={`${s.hx1},${s.hy1} ${s.tx1},${s.ty1} ${s.tx2},${s.ty2} ${s.hx2},${s.hy2}`} />
+        ))}
+      </>
+    );
+  } else if (g.type === "rod_tube") {
+    const webNow = webFraction * webThickness(g);
+    const rRod = Math.max(g.core_diameter / 2 - webNow, 0);
+    const rTubeI = Math.min(g.point_diameter / 2 + webNow, rGrainO);
+    bore = (
+      <>
+        {ring(rTubeI, "var(--cavity)", "none")}
+        {rRod > 0 && ring(rRod, "var(--propellant)", flameS, 1.5)}
+        <circle cx={c} cy={c} r={rTubeI * k} fill="none" stroke={flameS} strokeWidth={2.5} />
+        {ring(g.point_diameter / 2, "none", "var(--dim-derived)", 1, "2 2")}
+        {ring(g.core_diameter / 2, "none", "var(--dim-derived)", 1, "2 2")}
+      </>
+    );
+  }
+
   return (
     <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${S} ${S}`}
       className="mx-auto block max-h-[360px]" style={{ color: "var(--text)" }}>
@@ -516,20 +718,135 @@ export function TransverseSVG({
       {/* propellant (green) */}
       {ring(rGrainO, "var(--propellant)",
         badPart("grain") ? "var(--error)" : "var(--propellant-stroke)", badPart("grain") ? 1.8 : 1.2)}
-      {/* burnt zone + dark cavity */}
-      {g.type !== "endburner" && rCore > rCoreInit + 1e-9 && ring(rCore, "var(--burnt-zone)", "none")}
-      {g.type !== "endburner" && rCore > 0 && ring(rCore, "var(--cavity)", "none")}
-      {/* flame front at the bore */}
-      {g.type !== "endburner" && (
-        <circle cx={c} cy={c} r={rCore * k} fill="none" stroke="var(--flame)" strokeWidth={2.5} />
-      )}
-      {/* initial bore, dashed */}
-      {g.type !== "endburner" && rCore > rCoreInit + 1e-9 &&
-        ring(rCoreInit, "none", "currentColor", 0.8, "2 2")}
+      {bore}
       <text x={c} y={S - 6} textAnchor="middle" fontSize={11} fill="var(--dim-derived)">
         {t("ui.section_transverse")} · D_case {(rCaseO * 2000).toFixed(1)} mm
       </text>
     </svg>
+  );
+}
+
+/* ------------------------------------------------------- nozzle technical drawing */
+
+/**
+ * A standalone, dimensioned nozzle drawing for the Teknik rapor tab (Section 10.1
+ * extension) - drawn as part of the case (solid black), independent of the whole-
+ * engine views above so it can use its own, larger scale.
+ */
+export function NozzleTechnicalSVG({
+  svgRef,
+  design,
+  badPart,
+}: {
+  svgRef?: React.RefObject<SVGSVGElement | null>;
+  design: DesignDoc;
+  badPart: (n: string) => boolean;
+}) {
+  const { t } = useTranslation();
+  const nz = design.nozzle;
+  const rT = (nz.throat_diameter * 1000) / 2;
+  const rE = rT * Math.sqrt(nz.expansion_ratio);
+  const rChamber = (design.case.inner_diameter * 1000) / 2;
+
+  const convLen = Math.max(rChamber - rT, 0) / Math.tan(deg(nz.convergence_half_angle_deg));
+  const throatLen = nz.throat_length * 1000 || 0.3 * rT;
+  const divLen = Math.max(rE - rT, 0) / Math.tan(deg(nz.divergence_half_angle_deg));
+  const totalLen = Math.max(convLen + throatLen + divLen, 1);
+
+  const W = 680;
+  const PADX = 100;
+  const PADY = 92;
+  const scale = (W - 2 * PADX) / totalLen;
+  const dMax = 2 * Math.max(rChamber, rE);
+  const H = Math.round(dMax * scale) + 2 * PADY;
+  const axisY = PADY + (dMax * scale) / 2;
+  const sx = (xmm: number) => PADX + xmm * scale;
+  const yUp = (r: number) => axisY - r * scale;
+  const yDn = (r: number) => axisY + r * scale;
+
+  const pConv = convLen;
+  const pThroat = pConv + throatLen;
+  const pExit = pThroat + divLen;
+  const wallT = Math.max(rT * 0.7, 4);
+  const wallE = Math.max(rE * 0.4, 4);
+  const isBell = nz.contour_type === "bell";
+  const nozStroke = badPart("nozzle") ? "var(--error)" : "var(--nozzle-metal-stroke)";
+
+  const divOuter = isBell
+    ? `C ${sx(pThroat + divLen * 0.3)} ${yUp(rT + wallT)} ${sx(pExit - divLen * 0.15)} ${yUp(rE + wallE)} ` +
+      `${sx(pExit)} ${yUp(rE + wallE)} `
+    : `L ${sx(pExit)} ${yUp(rE + wallE)} `;
+  const divInner = isBell
+    ? `C ${sx(pExit - divLen * 0.15)} ${yDn(rE)} ${sx(pThroat + divLen * 0.3)} ${yDn(rT)} ${sx(pThroat)} ${yDn(rT)} `
+    : `L ${sx(pThroat)} ${yDn(rT)} `;
+  const bodyPath =
+    `M ${sx(0)} ${yUp(rChamber)} ` +
+    `L ${sx(pConv - convLen * 0.15)} ${yUp(rChamber * 0.97)} ` +
+    `Q ${sx(pConv - convLen * 0.15)} ${yUp(rT + wallT)} ${sx(pConv)} ${yUp(rT + wallT)} ` +
+    `L ${sx(pThroat)} ${yUp(rT + wallT)} ` +
+    `${divOuter}` +
+    `L ${sx(pExit)} ${yDn(rE + wallE)} ` +
+    (isBell
+      ? `C ${sx(pExit - divLen * 0.15)} ${yDn(rE + wallE)} ${sx(pThroat + divLen * 0.3)} ${yDn(rT + wallT)} ` +
+        `${sx(pThroat)} ${yDn(rT + wallT)} `
+      : `L ${sx(pThroat)} ${yDn(rT + wallT)} `) +
+    `L ${sx(pConv)} ${yDn(rT + wallT)} ` +
+    `Q ${sx(pConv - convLen * 0.15)} ${yDn(rT + wallT)} ${sx(pConv - convLen * 0.15)} ${yDn(rChamber * 0.97)} ` +
+    `L ${sx(0)} ${yDn(rChamber)} Z`;
+  const divFlowOut = isBell
+    ? `C ${sx(pThroat + divLen * 0.3)} ${yUp(rT)} ${sx(pExit - divLen * 0.15)} ${yUp(rE)} ${sx(pExit)} ${yUp(rE)} `
+    : `L ${sx(pExit)} ${yUp(rE)} `;
+  const cavityPath =
+    `M ${sx(0)} ${yUp(rChamber)} ` +
+    `L ${sx(pConv)} ${yUp(rT)} ` +
+    `L ${sx(pThroat)} ${yUp(rT)} ` +
+    `${divFlowOut}` +
+    `L ${sx(pExit)} ${yDn(rE)} ` +
+    `${divInner}` +
+    `L ${sx(pConv)} ${yDn(rT)} ` +
+    `L ${sx(0)} ${yDn(rChamber)} Z`;
+
+  const material = nz.material_id ?? design.case.material_id;
+
+  return (
+    <div className="space-y-2">
+      <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`}
+        className="min-w-[600px]" style={{ color: "var(--text)" }}>
+        <path d={bodyPath} fill="var(--case-color)" stroke={nozStroke} strokeWidth={1.4}>
+          <title>{`${t("drawing.nozzle")} · ${material}`}</title>
+        </path>
+        <path d={cavityPath} fill="var(--cavity)" />
+        <line x1={sx(-20)} y1={axisY} x2={sx(pExit) + 40} y2={axisY} stroke="var(--axis)"
+          strokeWidth={0.7} strokeDasharray="10 3 2 3" />
+
+        {/* dimensions */}
+        <DimLine x1={sx(pConv) + 22} x2={sx(pConv) + 22} y={yUp(rT)} y2={yDn(rT)}
+          vertical label={`d_t ${(rT * 2).toFixed(1)} mm`} />
+        <DimLine x1={sx(pExit) + 22} x2={sx(pExit) + 22} y={yUp(rE)} y2={yDn(rE)}
+          vertical label={`d_e ${(rE * 2).toFixed(1)} mm`} />
+        <DimLine x1={sx(0)} x2={sx(pConv)} y={PADY - 44} label={`L_c ${convLen.toFixed(1)} mm`} derived />
+        <DimLine x1={sx(pConv)} x2={sx(pThroat)} y={PADY - 44} label={`L_t ${throatLen.toFixed(1)} mm`}
+          derived />
+        <DimLine x1={sx(pThroat)} x2={sx(pExit)} y={PADY - 44} label={`L_d ${divLen.toFixed(1)} mm`}
+          derived />
+        <DimLine x1={sx(0)} x2={sx(pExit)} y={H - PADY + 30} label={`L_total ${totalLen.toFixed(1)} mm`} />
+
+        <text x={sx(pConv / 2)} y={yUp(rChamber) - 10} textAnchor="middle" fontSize={11}
+          fill="var(--dim-derived)">
+          {t("param.convergence_half_angle")} {nz.convergence_half_angle_deg.toFixed(0)}°
+        </text>
+        <text x={sx(pThroat + divLen / 2)} y={yUp(rE + wallE) - 10} textAnchor="middle" fontSize={11}
+          fill="var(--dim-derived)">
+          {t("param.divergence_half_angle")} {nz.divergence_half_angle_deg.toFixed(0)}° · {isBell ? "Bell" : "Conic"}
+        </text>
+        <text x={sx(pExit) + 26} y={PADY - 20} fontSize={11} fill="var(--dim-derived)">
+          ε = {nz.expansion_ratio.toFixed(2)}
+        </text>
+      </svg>
+      <p className="text-xs text-text-secondary">
+        {t("drawing.nozzle")} · {material}
+      </p>
+    </div>
   );
 }
 
@@ -607,7 +924,11 @@ function DimLine({
   derived?: boolean;
 }) {
   const color = derived ? "var(--dim-derived)" : "var(--dim)";
-  const mx = vertical ? x1 : (x1 + x2) / 2;
+  // vertical labels are left-aligned, starting clear of the line, rather than
+  // centred on it - centring would put half the text to the *left* of x1, which
+  // for a dimension line running right off a part's edge means half the label
+  // sits back over that part's own fill
+  const mx = vertical ? x1 + 4 : (x1 + x2) / 2;
   const my = vertical ? (y + (y2 ?? y)) / 2 : y - 5;
   return (
     <g stroke={color} fill={color} fontSize={10}>
@@ -619,7 +940,7 @@ function DimLine({
           <path d={`M${x2},${y} l-5,-3 v6 z`} />
         </>
       )}
-      <text x={mx} y={my} textAnchor="middle" stroke="none">
+      <text x={mx} y={my} textAnchor={vertical ? "start" : "middle"} stroke="none">
         {label}
       </text>
     </g>

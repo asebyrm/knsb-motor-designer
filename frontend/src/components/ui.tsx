@@ -8,41 +8,54 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-
-import { useStore } from "../store";
 
 /* ---------------------------------------------------------------- Info tooltip */
 /* Section 9: appears on ~400 ms hover, on focus, and on tapping the ? icon.
-   The text is shown in a shared bar in the centre of the header (<TipBar/>) so it
-   is never clipped by a scrolling panel. A visually-hidden span keeps
-   aria-describedby working for screen readers; typing is never blocked. */
+   Rendered as a fixed-position portal anchored to the "?" button's own screen
+   position (not a shared bar pinned to the header) so it always shows up right
+   next to the icon the user is looking at, however far down the page they have
+   scrolled, and is never clipped by an overflow:hidden panel either. A
+   visually-hidden span keeps aria-describedby working for screen readers. */
 
 export function Info({ tKey }: { tKey: string }) {
   const { t, i18n } = useTranslation();
-  const setTip = useStore((s) => s.setTip);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; above: boolean } | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const id = useId();
   const text = t(tKey);
   // missing key -> render nothing rather than leak the raw key
   if (text === tKey) return null;
 
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const above = r.bottom > window.innerHeight - 90; // near the bottom edge -> flip up
+    setPos({
+      top: above ? r.top - 8 : r.bottom + 8,
+      left: Math.min(Math.max(r.left + r.width / 2, 140), window.innerWidth - 140),
+      above,
+    });
+  };
   const show = () => {
     window.clearTimeout(timer.current);
-    setTip(text);
+    place();
   };
   const hide = () => {
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setTip(null), 120);
+    timer.current = window.setTimeout(() => setPos(null), 120);
   };
   const delayed = () => {
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setTip(text), 400);
+    timer.current = window.setTimeout(show, 400);
   };
 
   return (
     <span className="relative inline-flex">
       <button
+        ref={btnRef}
         type="button"
         aria-label={i18n.language === "tr" ? "Bilgi" : "Info"}
         aria-describedby={id}
@@ -60,25 +73,24 @@ export function Info({ tKey }: { tKey: string }) {
       <span id={id} className="sr-only">
         {text}
       </span>
+      {pos &&
+        createPortal(
+          <p
+            role="tooltip"
+            style={{
+              position: "fixed",
+              top: pos.top,
+              left: pos.left,
+              transform: `translate(-50%, ${pos.above ? "-100%" : "0"})`,
+            }}
+            className="pointer-events-none z-[200] max-w-xs rounded-md border border-border
+                       bg-surface-2 px-3 py-1.5 text-xs leading-snug text-text shadow-lg"
+          >
+            {text}
+          </p>,
+          document.body,
+        )}
     </span>
-  );
-}
-
-/* Shared display area — mount once in the header. */
-export function TipBar() {
-  const tip = useStore((s) => s.tip);
-  return (
-    <div
-      className="pointer-events-none flex min-h-[1.75rem] w-full items-center justify-center px-4"
-      aria-live="polite"
-    >
-      {tip && (
-        <p className="max-w-3xl rounded-md border border-border bg-surface-2 px-3 py-1
-                      text-center text-xs leading-snug text-text shadow-sm">
-          {tip}
-        </p>
-      )}
-    </div>
   );
 }
 

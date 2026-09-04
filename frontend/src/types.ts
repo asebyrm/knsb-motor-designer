@@ -1,10 +1,14 @@
 export interface GrainSpec {
-  type: "bates" | "tubular" | "endburner";
+  type: "bates" | "tubular" | "endburner" | "star" | "wagon_wheel" | "rod_tube";
   outer_diameter: number;
   core_diameter: number;
   segment_length: number;
   segment_count: number;
   segment_spacing: number;
+  /** star/wagon_wheel: tip/slot-tip diameter. rod_tube: tube (outer sleeve) bore diameter. */
+  point_diameter: number;
+  /** star: point count. wagon_wheel: slot count. Unused otherwise. */
+  n_points: number;
 }
 
 export interface NozzleSpec {
@@ -14,6 +18,9 @@ export interface NozzleSpec {
   convergence_half_angle_deg: number;
   efficiency: number;
   throat_length: number;
+  contour_type: "conic" | "bell";
+  material_id: string | null;
+  material_overrides?: Record<string, number>;
   erosion: { enabled: boolean; coefficient_mm_s: number; exponent: number };
 }
 
@@ -31,9 +38,10 @@ export interface DesignDoc {
     wall_thickness: number;
     length: number | null;
     print_method: "fdm" | "sls" | "machined";
+    material_overrides?: Record<string, number>;
   };
-  liner: { material_id: string; thickness: number } | null;
-  bulkhead: { material_id: string; thickness: number };
+  liner: { material_id: string; thickness: number; material_overrides?: Record<string, number> } | null;
+  bulkhead: { material_id: string; thickness: number; material_overrides?: Record<string, number> };
   assembly: { forward_gap: number; aft_gap: number };
   environment: { ambient_pressure: number };
   meop_bar: number;

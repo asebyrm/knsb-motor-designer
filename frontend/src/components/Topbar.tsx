@@ -1,9 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import { defaultDesign, useStore } from "../store";
+import { defaultDesign, deepMerge, useStore } from "../store";
 import { EXAMPLES } from "../lib/examples";
 import { Logo } from "./Logo";
-import { TipBar } from "./ui";
 
 export function Topbar({
   onLogin,
@@ -55,7 +54,7 @@ export function Topbar({
             value=""
             onChange={(e) => {
               const ex = EXAMPLES.find((x) => x.key === e.target.value);
-              if (ex) setDesign({ ...defaultDesign(), ...ex.design });
+              if (ex) setDesign(deepMerge(defaultDesign(), ex.design));
               e.currentTarget.value = "";
             }}
           >
@@ -123,9 +122,6 @@ export function Topbar({
           )}
         </div>
       </div>
-
-      {/* contextual help renders here, centred, so a scrolling panel never clips it */}
-      <TipBar />
 
       {view === "admin" && (
         <button

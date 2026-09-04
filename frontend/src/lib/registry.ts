@@ -36,19 +36,23 @@ export const FIELDS: FieldDef[] = [
   { id: "density_factor", group: "calibration", path: "propellant.density_factor", kind: "number", unit: "ratio", step: 0.01, min: 0.7, max: 1 },
   { id: "c_star_efficiency", group: "calibration", path: "propellant.c_star_efficiency", kind: "number", unit: "ratio", step: 0.01, min: 0.7, max: 1 },
   // grain
-  { id: "grain_type", group: "grain", path: "grain.type", kind: "select", unit: "none", basic: true, options: ["bates", "tubular", "endburner"] },
+  { id: "grain_type", group: "grain", path: "grain.type", kind: "select", unit: "none", basic: true, options: ["bates", "tubular", "endburner", "star", "wagon_wheel", "rod_tube"] },
   { id: "outer_diameter", group: "grain", path: "grain.outer_diameter", kind: "number", unit: "length_mm", basic: true, step: 1, min: 5 },
   { id: "core_diameter", group: "grain", path: "grain.core_diameter", kind: "number", unit: "length_mm", basic: true, step: 1, min: 1 },
+  { id: "point_diameter", group: "grain", path: "grain.point_diameter", kind: "number", unit: "length_mm", basic: true, step: 1, min: 1 },
+  { id: "n_points", group: "grain", path: "grain.n_points", kind: "number", unit: "count", basic: true, step: 1, min: 3, max: 16 },
   { id: "segment_length", group: "grain", path: "grain.segment_length", kind: "number", unit: "length_mm", basic: true, step: 1, min: 5 },
   { id: "segment_count", group: "grain", path: "grain.segment_count", kind: "number", unit: "count", basic: true, step: 1, min: 1, max: 12 },
   { id: "segment_spacing", group: "grain", path: "grain.segment_spacing", kind: "number", unit: "length_mm", step: 0.5, min: 0 },
   // nozzle
   { id: "throat_diameter", group: "nozzle", path: "nozzle.throat_diameter", kind: "number", unit: "length_mm", basic: true, step: 0.5, min: 2 },
   { id: "expansion_ratio", group: "nozzle", path: "nozzle.expansion_ratio", kind: "number", unit: "ratio", basic: true, step: 0.25, min: 1 },
+  { id: "contour_type", group: "nozzle", path: "nozzle.contour_type", kind: "select", unit: "none", basic: true, options: ["conic", "bell"] },
   { id: "divergence_half_angle", group: "nozzle", path: "nozzle.divergence_half_angle_deg", kind: "number", unit: "angle_deg", step: 1, min: 8, max: 25 },
   { id: "convergence_half_angle", group: "nozzle", path: "nozzle.convergence_half_angle_deg", kind: "number", unit: "angle_deg", step: 1, min: 20, max: 60 },
   { id: "nozzle_efficiency", group: "nozzle", path: "nozzle.efficiency", kind: "number", unit: "ratio", step: 0.01, min: 0.8, max: 1 },
   { id: "throat_length", group: "nozzle", path: "nozzle.throat_length", kind: "number", unit: "length_mm", step: 0.5, min: 0 },
+  { id: "nozzle_material", group: "nozzle", path: "nozzle.material_id", kind: "select", unit: "none" },
   { id: "erosion_enabled", group: "nozzle", path: "nozzle.erosion.enabled", kind: "bool", unit: "none" },
   { id: "erosion_coefficient", group: "nozzle", path: "nozzle.erosion.coefficient_mm_s", kind: "number", unit: "rate_mm_s", step: 0.01, min: 0 },
   { id: "erosion_exponent", group: "nozzle", path: "nozzle.erosion.exponent", kind: "number", unit: "ratio", step: 0.05, min: 0 },
@@ -86,7 +90,7 @@ export const MISSION_FIELDS: FieldDef[] = [
 /** Result metrics — must all have metric.<id> + info.metric.<id>. */
 export const METRICS = [
   "total_impulse", "average_thrust", "peak_thrust", "burn_time", "peak_pressure",
-  "meop", "specific_impulse", "propellant_mass", "total_mass", "mass_ratio",
+  "peak_pressure_eroded", "meop", "specific_impulse", "propellant_mass", "total_mass", "mass_ratio",
   "designation", "fos", "min_j", "lstar", "thrust_to_weight", "kn", "motor_mass",
   "inert_mass", "total_length", "cg_initial", "cg_burnout",
 ] as const;

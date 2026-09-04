@@ -12,6 +12,7 @@ const SUMMARY_KEY: Record<string, string> = {
   peak_thrust: "peak_thrust",
   burn_time: "burn_time",
   peak_pressure: "peak_pressure_no_erosion_bar",
+  peak_pressure_eroded: "peak_pressure_bar",
   meop: "meop_bar",
   specific_impulse: "specific_impulse",
   propellant_mass: "propellant_mass",
@@ -30,18 +31,21 @@ const SUMMARY_KEY: Record<string, string> = {
   kn: "kn",
 };
 
-const PRIMARY = ["total_impulse", "average_thrust", "peak_pressure", "meop", "burn_time",
-  "specific_impulse", "designation", "fos", "min_j"];
+const PRIMARY = ["total_impulse", "average_thrust", "peak_pressure", "peak_pressure_eroded",
+  "meop", "burn_time", "specific_impulse", "designation", "fos", "min_j"];
 
 export function ResultsPanel({ result }: { result: SimResult | undefined }) {
   const { t } = useTranslation();
-  const { units } = useStore();
+  const { units, design } = useStore();
   const lng = t("ui.run") ? (document.documentElement.lang || "en") : "en";
 
   if (!result) return <div className="p-3 text-sm text-text-secondary">{t("ui.loading")}</div>;
   const s = result.summary;
+  const erosionOn = Boolean(design.nozzle.erosion.enabled);
 
-  const shown = METRICS.filter((m) => SUMMARY_KEY[m] in s);
+  const shown = METRICS.filter(
+    (m) => SUMMARY_KEY[m] in s && (m !== "peak_pressure_eroded" || erosionOn),
+  );
   const primary = shown.filter((m) => PRIMARY.includes(m));
   const secondary = shown.filter((m) => !PRIMARY.includes(m));
 

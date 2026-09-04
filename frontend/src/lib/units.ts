@@ -68,6 +68,7 @@ export function fmtMetricValue(id: string, value: number, s: UnitSystem, locale:
     case "burn_time":
       return `${nf(value, 2)} s`;
     case "peak_pressure":
+    case "peak_pressure_eroded":
     case "meop":
       return s === "imperial" ? `${nf((value * 1e5) / PSI, 0)} psi` : `${nf(value, 2)} bar`;
     case "specific_impulse":

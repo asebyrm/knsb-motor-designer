@@ -10,11 +10,16 @@ import pytest
 from core.grains.base import available_grains, make_grain
 from core.grains.bates import BatesGrain, suggest_neutral_segment_length
 from core.grains.endburner import EndBurnerGrain
+from core.grains.rod_tube import RodTubeGrain
+from core.grains.star import StarGrain
 from core.grains.tubular import TubularGrain
+from core.grains.wagon_wheel import WagonWheelGrain
 
 
 def test_registry_has_builtin_geometries():
-    assert set(available_grains()) >= {"bates", "tubular", "endburner"}
+    assert set(available_grains()) >= {
+        "bates", "tubular", "endburner", "star", "wagon_wheel", "rod_tube",
+    }
     g = make_grain("bates", outer_diameter=0.05, core_diameter=0.02,
                    segment_length=0.1, segment_count=2)
     assert isinstance(g, BatesGrain)
@@ -84,3 +89,72 @@ def test_bates_svg_is_wellformed():
     svg = g.cross_section_svg(0.003)
     assert svg.startswith("<g") and svg.endswith("</g>")
     assert "circle" in svg
+
+
+# --- star / wagon-wheel / rod-and-tube (Section 5.2 extension) ---------------
+
+
+def test_star_volume_matches_area_integral():
+    """Same regression identity as BATES: -dV/dweb == burn_area(web), this time for
+    a polygon-offset (numeric, not closed-form) geometry."""
+    g = StarGrain(outer_diameter=0.06, core_diameter=0.015, point_diameter=0.045,
+                  length=0.1, n_points=6)
+    web = np.linspace(0, g.web_thickness() * 0.98, 200)
+    vol = np.array([g.volume(x) for x in web])
+    area = np.array([g.burn_area(x) for x in web])
+    dvol = -np.gradient(vol, web)
+    sl = slice(5, -5)
+    assert np.allclose(dvol[sl], area[sl], rtol=0.05, atol=area.max() * 0.02)
+
+
+def test_star_burns_out_to_zero():
+    g = StarGrain(outer_diameter=0.06, core_diameter=0.015, point_diameter=0.045,
+                  length=0.1, n_points=6)
+    assert g.burn_area(g.web_thickness()) == pytest.approx(0.0, abs=1e-6)
+    assert g.volume(g.web_thickness()) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_star_rejects_bad_radii_order():
+    with pytest.raises(ValueError):
+        StarGrain(0.06, 0.05, 0.03, 0.1)  # point_diameter < core_diameter
+
+
+def test_wagon_wheel_volume_matches_area_integral():
+    g = WagonWheelGrain(outer_diameter=0.06, core_diameter=0.012, point_diameter=0.045,
+                        length=0.1, n_points=4)
+    web = np.linspace(0, g.web_thickness() * 0.98, 200)
+    vol = np.array([g.volume(x) for x in web])
+    area = np.array([g.burn_area(x) for x in web])
+    dvol = -np.gradient(vol, web)
+    sl = slice(5, -5)
+    assert np.allclose(dvol[sl], area[sl], rtol=0.05, atol=area.max() * 0.02)
+
+
+def test_rod_tube_is_neutral_when_balanced():
+    """Rod web == tube web -> burn area should stay essentially flat throughout,
+    the classic rod-and-tube "top hat" curve."""
+    g = RodTubeGrain(outer_diameter=0.05, core_diameter=0.020, point_diameter=0.030,
+                     length=0.1)  # rod web = 10mm, tube web = 25-15 = 10mm
+    a0 = g.burn_area(0.0)
+    a_mid = g.burn_area(g.web_thickness() * 0.5)
+    a_end = g.burn_area(g.web_thickness() * 0.999)
+    assert a_mid == pytest.approx(a0, rel=0.01)
+    assert a_end == pytest.approx(a0, rel=0.05)
+
+
+def test_rod_tube_volume_matches_area_integral():
+    g = RodTubeGrain(outer_diameter=0.05, core_diameter=0.012, point_diameter=0.030,
+                     length=0.1)
+    web = np.linspace(0, g.web_thickness() * 0.999, 400)
+    vol = np.array([g.volume(x) for x in web])
+    area = np.array([g.burn_area(x) for x in web])
+    dvol = -np.gradient(vol, web)
+    sl = slice(5, -5)
+    assert np.allclose(dvol[sl], area[sl], rtol=0.02, atol=area.max() * 0.01)
+
+
+def test_rod_tube_rejects_bad_dimensions():
+    with pytest.raises(ValueError):
+        RodTubeGrain(0.05, 0.06, 0.03, 0.1)   # rod bigger than the case
+    with pytest.raises(ValueError):
+        RodTubeGrain(0.05, 0.02, 0.06, 0.1)   # tube bore bigger than the case

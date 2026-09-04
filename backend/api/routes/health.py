@@ -38,12 +38,28 @@ def catalog() -> dict:
         "case_materials": [
             {"id": m.id, "name_tr": m.name_tr, "name_en": m.name_en,
              "tensile_strength": m.tensile_strength, "max_service_temp": m.max_service_temp,
-             "notes_key": m.notes_key}
+             "notes_key": m.notes_key,
+             # full property set (Section 5.6) - lets the frontend show/edit every
+             # number that actually feeds the structural/thermal analysis, not just
+             # the two headline figures above
+             "properties": {
+                 "tensile_strength": m.tensile_strength, "yield_strength": m.yield_strength,
+                 "print_direction_factor": m.print_direction_factor,
+                 "elastic_modulus": m.elastic_modulus, "density": m.density,
+                 "thermal_conductivity": m.thermal_conductivity,
+                 "specific_heat": m.specific_heat, "glass_transition": m.glass_transition,
+                 "max_service_temp": m.max_service_temp,
+             }}
             for m in case_materials().values()
         ],
         "liner_materials": [
             {"id": m.id, "name_tr": m.name_tr, "name_en": m.name_en,
-             "min_thickness": m.min_thickness, "notes_key": m.notes_key}
+             "min_thickness": m.min_thickness, "notes_key": m.notes_key,
+             "properties": {
+                 "ablation_rate": m.ablation_rate, "min_thickness": m.min_thickness,
+                 "thermal_conductivity": m.thermal_conductivity, "density": m.density,
+                 "specific_heat": m.specific_heat, "max_interface_temp": m.max_interface_temp,
+             }}
             for m in liner_materials().values()
         ],
         "warning_codes": [

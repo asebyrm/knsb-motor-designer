@@ -52,10 +52,11 @@ class ErosionParams:
 class Nozzle:
     throat_diameter: float                    # m
     expansion_ratio: float = 4.0              # A_e / A_t
-    divergence_half_angle_deg: float = 15.0   # alpha
+    divergence_half_angle_deg: float = 15.0   # alpha - the divergent cone's own half-angle
     convergence_half_angle_deg: float = 45.0
     efficiency: float = 0.95                  # eta_nozzle
     throat_length: float = 0.0                # m (for the technical drawing)
+    contour_type: str = "conic"               # "conic" | "bell" - Section 5.3
     erosion: ErosionParams = field(default_factory=ErosionParams)
 
     # --- areas -------------------------------------------------------
@@ -74,8 +75,17 @@ class Nozzle:
 
     @property
     def divergence_loss(self) -> float:
-        """lambda = (1 + cos(alpha)) / 2."""
-        return (1.0 + math.cos(math.radians(self.divergence_half_angle_deg))) / 2.0
+        """lambda = (1 + cos(alpha)) / 2.
+
+        A "bell" contour is approximated the standard way: its parabolic wall has a
+        much smaller average local flow angle than a straight cone sharing the same
+        exit half-angle, so the loss is evaluated at half that angle rather than the
+        full one (a common first-order stand-in for a proper Rao contour, since this
+        model does not trace the wall shape point by point).
+        """
+        alpha = self.divergence_half_angle_deg / 2.0 if self.contour_type == "bell" \
+            else self.divergence_half_angle_deg
+        return (1.0 + math.cos(math.radians(alpha))) / 2.0
 
     # --- gas dynamics ---------------------------------------------------
 
@@ -171,6 +181,7 @@ class Nozzle:
             "convergence_half_angle_deg": self.convergence_half_angle_deg,
             "efficiency": self.efficiency,
             "throat_length": self.throat_length,
+            "contour_type": self.contour_type,
             "erosion": {
                 "enabled": self.erosion.enabled,
                 "coefficient_mm_s": self.erosion.coefficient_mm_s,

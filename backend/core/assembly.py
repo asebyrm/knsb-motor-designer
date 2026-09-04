@@ -80,6 +80,7 @@ class MotorAssembly:
     forward_gap: float = 0.002     # m ullage forward of the grain
     aft_gap: float = 0.002         # m between grain and nozzle seat
     nozzle_material_density: float = _GRAPHITE_DENSITY
+    nozzle_material_id: str = "graphite"
     nozzle_outer_diameter: float | None = None  # defaults to case OD
 
     # --- derived diameters --------------------------------------------
@@ -185,7 +186,7 @@ class MotorAssembly:
         noz_len = conv + throat + div
         noz_mass = self._nozzle_mass()
         parts.append(Part("nozzle", noz_start, noz_start + noz_len, self.nozzle_od,
-                          self.nozzle.throat_diameter, "graphite", noz_mass,
+                          self.nozzle.throat_diameter, self.nozzle_material_id, noz_mass,
                           noz_start + 0.45 * noz_len))
 
         return parts
