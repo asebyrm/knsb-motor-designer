@@ -656,8 +656,12 @@ export function TransverseSVG({
   if (g.type !== "endburner" && !shaped) {
     bore = (
       <>
+        {/* burnt zone [rCoreInit, rCore) then the true (always-open) cavity
+            [0, rCoreInit) drawn smaller on top - same nested-circle rule as the
+            liner above: a circle's own color shows above its own radius, not
+            below it, so cavity must use the *smaller* radius here */}
         {rCore > rCoreInit + 1e-9 && ring(rCore, "var(--burnt-zone)", "none")}
-        {rCore > 0 && ring(rCore, "var(--cavity)", "none")}
+        {rCore > 0 && ring(rCoreInit, "var(--cavity)", "none")}
         <circle cx={c} cy={c} r={rCore * k} fill="none" stroke={flameS} strokeWidth={2.5} />
         {rCore > rCoreInit + 1e-9 && ring(rCoreInit, "none", "var(--dim-derived)", 1, "2 2")}
       </>
@@ -710,10 +714,16 @@ export function TransverseSVG({
       className="mx-auto block max-h-[360px]" style={{ color: "var(--text)" }}>
       {/* case wall */}
       {ring(rCaseO, "var(--case-color)", caseS, 1.3)}
-      {ring(rCaseI, "var(--surface)", caseS)}
-      {/* liner */}
+      {/* liner sits directly against the case, so it (not empty background) is
+          what the case bore reveals; a second, smaller circle then reveals empty
+          background again at the liner's own inner edge - the two together are
+          what makes the visible liner band exactly [rLinerI, rCaseI), not
+          [grain edge, rLinerI) like a single circle here would (nested filled
+          circles show a color from their own radius up to whatever smaller
+          circle is drawn after them, not down to it) */}
+      {ring(rCaseI, linerT > 0 ? linerColor(design.liner?.material_id) : "var(--surface)", caseS)}
       {linerT > 0 &&
-        ring(rLinerI, linerColor(design.liner?.material_id), badPart("liner") ? "var(--error)" : "currentColor")}
+        ring(rLinerI, "var(--surface)", badPart("liner") ? "var(--error)" : "currentColor")}
       {/* propellant (green) */}
       {ring(rGrainODraw, "var(--propellant)",
         badPart("grain") ? "var(--error)" : "var(--propellant-stroke)", badPart("grain") ? 1.8 : 1.2)}
