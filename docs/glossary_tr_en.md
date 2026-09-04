@@ -146,6 +146,7 @@
 | --- | --- | --- |
 | `apply_suggestion` — Apply suggestion / Öneriyi uygula | Apply the suggested value and re-run the search. | Önerilen değeri uygular ve aramayı yeniden çalıştırır. |
 | `estimate_from_altitude` — Estimate from altitude / İrtifadan hesapla | Runs the 1-DOF solver and proposes three motors for your target altitude. | 1-DOF çözücüyü çalıştırır ve hedef irtifan için üç motor önerir. |
+| `load` — None | Load a design someone shared with you - pick the .json file they exported (Export → .json). | Birinin seninle paylaştığı bir tasarımı yükle - dışa aktardığı .json dosyasını seç (Dışa aktar → .json). |
 | `make_neutral` — Make neutral / Nötr yap | Sets the segment length so the burning area stays constant through the burn (a flat pressure curve). | Segment boyunu, yanan alanı yanma boyunca sabit tutacak şekilde ayarlar (düz basınç eğrisi). |
 | `make_neutral_disabled` — None | Only available for BATES grains. | Yalnızca BATES grain'lerde kullanılabilir. |
 | `optimum_expansion` — Optimum expansion / Optimum genişleme | Sets the expansion ratio so the exhaust is fully expanded to the ambient pressure you entered. | Genişleme oranını, egzozun girdiğin ortam basıncına tam genişleyeceği şekilde ayarlar. |

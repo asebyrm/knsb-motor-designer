@@ -348,19 +348,15 @@ export function LongitudinalSVG({
     );
   }
 
-  // liner — the band between the case bore and the grain OD (skipped where too thin to see).
-  // Kept at least a couple of px wide on screen even when the true clearance is very
-  // tight (or zero, a snug fit) by drawing the grain very slightly smaller than its
-  // real OD here - a schematic legibility exaggeration only, the dimension table and
-  // physics both keep using the real grain.outer_diameter untouched.
+  // liner — the band between the case bore and the grain OD (skipped where too thin to
+  // see). rLinerI never goes below the true grain OD, so a snug (even zero-clearance)
+  // fit still shows the liner at its full nominal thickness with no gap; it only
+  // shrinks below nominal for genuine interference (grain OD past that boundary).
   const linerTmm = (design.liner?.thickness ?? 0) * 1000;
-  const MIN_LINER_PX = 3;
-  const rGrainODraw = linerTmm > 0.01
-    ? Math.max(Math.min(rGrainO, rCaseI - linerTmm - MIN_LINER_PX / scale), rGrainO * 0.7)
-    : rGrainO;
+  const rGrainODraw = rGrainO;
   if (linerTmm > 0.01) {
     const rLinerO = rCaseI;
-    const rLinerI = Math.max(rCaseI - linerTmm, rGrainODraw);
+    const rLinerI = Math.max(rCaseI - linerTmm, rGrainO);
     const lc = linerColor(design.liner?.material_id);
     for (const sign of [-1, 1]) {
       const yA = sign < 0 ? yUp(rLinerO) : yDn(rLinerI);
@@ -637,14 +633,11 @@ export function TransverseSVG({
   const rCore = burntCoreDia(g, webFraction) / 2;
   const rCoreInit = g.core_diameter / 2;
   const k = (c - 16) / rCaseO; // scale m -> px
-  // keep at least a couple of px of visible liner ring even when the true
-  // clearance between the liner bore and the grain OD is very tight (or zero,
-  // a snug design) - a schematic legibility exaggeration for the drawing only,
-  // never for the dimension table or any real physics
-  const MIN_LINER_PX = 3;
-  const rGrainODraw = linerT > 0
-    ? Math.max(Math.min(rGrainO, rLinerI - MIN_LINER_PX / k), rGrainO * 0.7)
-    : rGrainO;
+  // liner is drawn independently of the grain (two nested circles closing off its
+  // own band, see below), so it stays visible at its full nominal thickness
+  // regardless of how tight the true clearance to the grain is - no artificial
+  // grain shrink needed here any more.
+  const rGrainODraw = rGrainO;
   const ring = (r: number, fill: string, s: string, sw = 1, dash?: string) => (
     <circle cx={c} cy={c} r={r * k} fill={fill} stroke={s} strokeWidth={sw} strokeDasharray={dash} />
   );
@@ -661,7 +654,7 @@ export function TransverseSVG({
             liner above: a circle's own color shows above its own radius, not
             below it, so cavity must use the *smaller* radius here */}
         {rCore > rCoreInit + 1e-9 && ring(rCore, "var(--burnt-zone)", "none")}
-        {rCore > 0 && ring(rCoreInit, "var(--cavity)", "none")}
+        {rCore > 0 && ring(rCoreInit, "var(--surface)", "none")}
         <circle cx={c} cy={c} r={rCore * k} fill="none" stroke={flameS} strokeWidth={2.5} />
         {rCore > rCoreInit + 1e-9 && ring(rCoreInit, "none", "var(--dim-derived)", 1, "2 2")}
       </>
@@ -669,7 +662,7 @@ export function TransverseSVG({
   } else if (g.type === "star") {
     bore = (
       <>
-        <polygon points={starPolygonPoints(g, webFraction, k, c)} fill="var(--cavity)"
+        <polygon points={starPolygonPoints(g, webFraction, k, c)} fill="var(--surface)"
           stroke={flameS} strokeWidth={2} />
         <polygon points={starPolygonPoints(g, 0, k, c)} fill="none"
           stroke="var(--dim-derived)" strokeWidth={1} strokeDasharray="2 2" />
@@ -680,9 +673,9 @@ export function TransverseSVG({
     const { hubR: hubR0, slots: slots0 } = wagonWheelSlots(g, 0, k, c);
     bore = (
       <>
-        <circle cx={c} cy={c} r={hubR} fill="var(--cavity)" stroke={flameS} strokeWidth={2} />
+        <circle cx={c} cy={c} r={hubR} fill="var(--surface)" stroke={flameS} strokeWidth={2} />
         {slots.map((s, i) => (
-          <polygon key={i} fill="var(--cavity)" stroke={flameS} strokeWidth={2}
+          <polygon key={i} fill="var(--surface)" stroke={flameS} strokeWidth={2}
             points={`${s.hx1},${s.hy1} ${s.tx1},${s.ty1} ${s.tx2},${s.ty2} ${s.hx2},${s.hy2}`} />
         ))}
         <circle cx={c} cy={c} r={hubR0} fill="none" stroke="var(--dim-derived)" strokeWidth={1}
@@ -700,7 +693,7 @@ export function TransverseSVG({
     const rTubeI = Math.min(g.point_diameter / 2 + webNow, rGrainO);
     bore = (
       <>
-        {ring(rTubeI, "var(--cavity)", "none")}
+        {ring(rTubeI, "var(--surface)", "none")}
         {rRod > 0 && ring(rRod, "var(--propellant)", flameS, 1.5)}
         <circle cx={c} cy={c} r={rTubeI * k} fill="none" stroke={flameS} strokeWidth={2.5} />
         {ring(g.point_diameter / 2, "none", "var(--dim-derived)", 1, "2 2")}
@@ -815,6 +808,8 @@ export function NozzleTechnicalSVG({
           strokeWidth={0.7} strokeDasharray="10 3 2 3" />
 
         {/* dimensions */}
+        <DimLine x1={sx(0) - 85} x2={sx(0) - 85} y={yUp(rOuter)} y2={yDn(rOuter)}
+          vertical label={`d_o ${(rOuter * 2).toFixed(1)} mm`} />
         <DimLine x1={sx(pConv) + 22} x2={sx(pConv) + 22} y={yUp(rT)} y2={yDn(rT)}
           vertical label={`d_t ${(rT * 2).toFixed(1)} mm`} />
         <DimLine x1={sx(pExit) + 22} x2={sx(pExit) + 22} y={yUp(rE)} y2={yDn(rE)}

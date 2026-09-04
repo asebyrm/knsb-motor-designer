@@ -6,7 +6,9 @@
     "recalculating": "Recalculating…",
     "run": "Run",
     "save": "Save",
+    "load": "Load",
     "export": "Export",
+    "import_error": "Couldn't read that as a design file (.json exported from here).",
     "login": "Log in",
     "logout": "Log out",
     "register": "Sign up",
@@ -45,6 +47,15 @@
     "export_locked": "Export is locked while a red warning is present.",
     "export_locked_why": "Fix the danger-level warning, or tick “I accept the risk”.",
     "accept_risk": "I accept the risk",
+    "export_desc": {
+      "eng": "Thrust-curve motor file for OpenRocket / RockSim flight simulation.",
+      "rse": "Same motor data as .eng, in RockSim's own XML format.",
+      "csv": "Raw simulation time series - pressure, thrust, Kn, mass flow, per timestep.",
+      "json": "The full design document (every input) - reload it, or send it to someone else to open.",
+      "pdf": "The full technical report: drawing, dimensions, BOM and warnings.",
+      "svg": "The technical drawing alone, as a vector file.",
+      "nozzle_csv": "The nozzle's internal contour as (x, r) coordinates, for CNC/lathe machining."
+    },
     "web_slider": "Burn position (web)",
     "layers": "Layers",
     "layer_dimensions": "Dimension lines",
@@ -336,6 +347,7 @@
       "estimate_from_altitude": "Runs the 1-DOF solver and proposes three motors for your target altitude.",
       "run_mission": "Search for BATES motors that reach the target apogee within your constraints.",
       "toggle_units": "Switch every field and result between metric and imperial units.",
+      "load": "Load a design someone shared with you - pick the .json file they exported (Export → .json).",
       "apply_suggestion": "Apply the suggested value and re-run the search.",
       "make_neutral_disabled": "Only available for BATES grains."
     },

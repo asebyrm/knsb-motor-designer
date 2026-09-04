@@ -1,8 +1,10 @@
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { defaultDesign, deepMerge, useStore } from "../store";
 import { EXAMPLES } from "../lib/examples";
 import { Logo } from "./Logo";
+import type { DesignDoc } from "../types";
 
 export function Topbar({
   onLogin,
@@ -21,6 +23,24 @@ export function Topbar({
 }) {
   const { t, i18n } = useTranslation();
   const { mode, setMode, units, setUnits, theme, setTheme, user, setUser, setDesign } = useStore();
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // so re-picking the same file fires onChange again
+    if (!file) return;
+    setImportError(null);
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== "object" || !parsed.grain || !parsed.nozzle || !parsed.case) {
+        throw new Error("not a design file");
+      }
+      setDesign(deepMerge(defaultDesign(), parsed as Partial<DesignDoc>));
+    } catch {
+      setImportError(t("ui.import_error"));
+    }
+  }
 
   return (
     <header className="border-b border-border bg-surface">
@@ -86,12 +106,19 @@ export function Topbar({
             {theme === "dark" ? "☾" : "☀"}
           </button>
 
+          <input ref={importInputRef} type="file" accept="application/json,.json"
+            className="hidden" onChange={handleImportFile} />
+          <button className="btn-ghost text-xs" onClick={() => importInputRef.current?.click()}
+            title={t("info.action.load")}>
+            {t("ui.load")}
+          </button>
           <button className="btn-ghost text-xs" onClick={onSave}>
             {t("ui.save")}
           </button>
           <button className="btn-primary text-xs" onClick={onExport}>
             {t("ui.export")}
           </button>
+          {importError && <span className="text-xs text-danger">{importError}</span>}
 
           {/* auth group — set apart from the tool buttons */}
           <span className="mx-1 h-6 w-px bg-border" aria-hidden />

@@ -6,7 +6,9 @@
     "recalculating": "Yeniden hesaplanıyor…",
     "run": "Çalıştır",
     "save": "Kaydet",
+    "load": "Yükle",
     "export": "Dışa aktar",
+    "import_error": "Bu bir tasarım dosyası (buradan dışa aktarılmış .json) olarak okunamadı.",
     "login": "Giriş yap",
     "logout": "Çıkış yap",
     "register": "Kayıt ol",
@@ -45,6 +47,15 @@
     "export_locked": "Kırmızı bir uyarı varken dışa aktarım kilitlidir.",
     "export_locked_why": "Tehlike seviyesindeki uyarıyı giderin veya “Riski kabul ediyorum” kutusunu işaretleyin.",
     "accept_risk": "Riski kabul ediyorum",
+    "export_desc": {
+      "eng": "OpenRocket / RockSim uçuş simülasyonu için itki eğrisi motor dosyası.",
+      "rse": ".eng ile aynı motor verisi, RockSim'in kendi XML biçiminde.",
+      "csv": "Ham simülasyon zaman serisi - her zaman adımında basınç, itki, Kn, kütle debisi.",
+      "json": "Tüm tasarım belgesi (her girdi) - yeniden yükle, ya da başkasının açması için gönder.",
+      "pdf": "Tam teknik rapor: çizim, ölçüler, parça listesi (BOM) ve uyarılar.",
+      "svg": "Yalnızca teknik çizim, vektörel dosya olarak.",
+      "nozzle_csv": "Nozzle'ın iç profili (x, r) koordinatları olarak, CNC/torna işleme için."
+    },
     "web_slider": "Yanma konumu (web)",
     "layers": "Katmanlar",
     "layer_dimensions": "Ölçü çizgileri",
@@ -336,6 +347,7 @@
       "estimate_from_altitude": "1-DOF çözücüyü çalıştırır ve hedef irtifan için üç motor önerir.",
       "run_mission": "Kısıtların içinde hedef irtifaya ulaşan BATES motorlarını arar.",
       "toggle_units": "Tüm alanları ve sonuçları metrik ile imperial arasında değiştirir.",
+      "load": "Birinin seninle paylaştığı bir tasarımı yükle - dışa aktardığı .json dosyasını seç (Dışa aktar → .json).",
       "apply_suggestion": "Önerilen değeri uygular ve aramayı yeniden çalıştırır.",
       "make_neutral_disabled": "Yalnızca BATES grain'lerde kullanılabilir."
     },

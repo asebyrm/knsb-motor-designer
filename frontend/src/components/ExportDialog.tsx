@@ -45,20 +45,26 @@ export function ExportDialog({
           </label>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-1.5">
         {FORMATS.map((f) => {
           const safetyFmt = f === "eng" || f === "rse";
           const disabled = locked && safetyFmt && !accept;
           return (
-            <button
-              key={f}
-              className="btn-ghost"
-              disabled={disabled}
-              onClick={() => doExport(f)}
-              title={disabled ? t("ui.export_locked_why") : undefined}
-            >
-              .{f.replace("_", " ")}
-            </button>
+            <div key={f} className="flex items-center justify-between gap-3 rounded border
+                                     border-border p-2">
+              <div className="min-w-0">
+                <p className="font-mono text-sm font-semibold">.{f}</p>
+                <p className="text-xs text-text-secondary">{t(`ui.export_desc.${f}`)}</p>
+              </div>
+              <button
+                className="btn-ghost shrink-0 text-xs"
+                disabled={disabled}
+                onClick={() => doExport(f)}
+                title={disabled ? t("ui.export_locked_why") : undefined}
+              >
+                {t("ui.download")}
+              </button>
+            </div>
           );
         })}
       </div>
