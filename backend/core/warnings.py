@@ -84,7 +84,6 @@ _CATALOGUE: dict[str, Level] = {
     "WARN_THERMAL_LIMIT": Level.DANGER,
     "WARN_NO_LINER": Level.DANGER,
     "WARN_LINER_THIN": Level.WARNING,
-    "WARN_LONG_BURN_THERMAL": Level.WARNING,
     # assembly / fit
     "WARN_FIT_GRAIN_DIAMETER": Level.DANGER,
     "WARN_FIT_GRAIN_LENGTH": Level.DANGER,

@@ -7,9 +7,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# system deps for psycopg / reportlab
+# system deps for psycopg / reportlab; fonts-dejavu-core gives the PDF report a
+# Unicode font so Turkish letters (ı, ğ, ş, İ, Ğ, Ş) render (see core/export/fonts.py)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential libpq5 curl \
+        build-essential libpq5 curl fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/ ./backend/

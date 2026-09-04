@@ -84,17 +84,6 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
     setEditing(null);
   }
 
-  function downloadSvg() {
-    if (!svgRef.current) return;
-    const blob = new Blob([svgRef.current.outerHTML], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${design.name.replace(/\s+/g, "_")}-${section}.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   async function downloadPdf() {
     setPdfBusy(true);
     try {
@@ -151,9 +140,6 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
           </label>
         ))}
         <span className="ml-auto flex items-center gap-2">
-          <button className="btn-ghost text-xs" onClick={downloadSvg}>
-            {t("ui.download_drawing")}
-          </button>
           <button className="btn-primary text-xs" onClick={downloadPdf} disabled={pdfBusy}>
             {pdfBusy ? t("ui.recalculating") : t("ui.download_pdf_report")}
           </button>

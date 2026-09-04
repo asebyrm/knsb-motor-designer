@@ -22,8 +22,6 @@ from dataclasses import dataclass
 from core.assembly import MotorAssembly
 from core.warnings import Warning, make
 
-_LONG_BURN = 3.0  # s
-
 
 @dataclass
 class ThermalResult:
@@ -115,8 +113,12 @@ def analyse_thermal(
         warnings.append(make("WARN_LINER_THIN",
                              liner_mm=round(liner.thickness * 1e3, 2),
                              recommended_mm=round(recommended * 1e3, 2)))
-    if burn_time > _LONG_BURN:
-        warnings.append(make("WARN_LONG_BURN_THERMAL", burn_time_s=round(burn_time, 2)))
+    # Note: a burn longer than 3 s is not flagged on its own - it is already
+    # priced into `recommended` (LinerMaterial.recommended_thickness scales up
+    # past 3 s) and into the semi-infinite soak estimate above; WARN_LINER_THIN /
+    # WARN_THERMAL_LIMIT are the actionable checks. A standalone "burn > 3 s"
+    # warning was just restating a computed number (Section 5.8 already reports
+    # burn_time as an output metric), not a distinct problem to fix.
 
     is_safe = remaining > 0.0 and t_case <= case_mat.max_service_temp
     return ThermalResult(

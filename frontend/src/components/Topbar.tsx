@@ -25,13 +25,13 @@ export function Topbar({
 
   return (
     <header className="border-b border-border bg-surface">
-      <div className="flex flex-wrap items-center gap-2 px-3 pt-2">
+      <div className="flex flex-wrap items-center gap-3 px-3 py-2">
         <button
-          className="flex items-center gap-2 text-text"
+          className="flex items-center gap-3 text-text"
           onClick={() => setView("designer")}
         >
-          <Logo size={44} />
-          <span className="text-base font-semibold">KNSB Motor Designer</span>
+          <Logo size={88} />
+          <span className="text-xl font-semibold">KNSB Motor Designer</span>
         </button>
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5 text-sm">

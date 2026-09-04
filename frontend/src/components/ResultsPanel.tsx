@@ -12,6 +12,7 @@ const SUMMARY_KEY: Record<string, string> = {
   peak_thrust: "peak_thrust",
   burn_time: "burn_time",
   peak_pressure: "peak_pressure_no_erosion_bar",
+  meop: "meop_bar",
   specific_impulse: "specific_impulse",
   propellant_mass: "propellant_mass",
   total_mass: "motor_mass_kg",
@@ -29,7 +30,7 @@ const SUMMARY_KEY: Record<string, string> = {
   kn: "kn",
 };
 
-const PRIMARY = ["total_impulse", "average_thrust", "peak_pressure", "burn_time",
+const PRIMARY = ["total_impulse", "average_thrust", "peak_pressure", "meop", "burn_time",
   "specific_impulse", "designation", "fos", "min_j"];
 
 export function ResultsPanel({ result }: { result: SimResult | undefined }) {
@@ -44,6 +45,9 @@ export function ResultsPanel({ result }: { result: SimResult | undefined }) {
   const primary = shown.filter((m) => PRIMARY.includes(m));
   const secondary = shown.filter((m) => !PRIMARY.includes(m));
 
+  const meopExceeded =
+    Number(s.peak_pressure_no_erosion_bar) > Number(s.meop_bar ?? Infinity);
+
   const row = (m: string) => {
     const raw = s[SUMMARY_KEY[m]];
     const val =
@@ -56,13 +60,17 @@ export function ResultsPanel({ result }: { result: SimResult | undefined }) {
             : m === "total_mass" || m === "motor_mass" || m === "inert_mass"
               ? fmtMetricValue(m, Number(raw), units, lng)
               : fmtMetricValue(m, Number(raw), units, lng);
+    const flagged = (m === "peak_pressure" || m === "meop") && meopExceeded;
     return (
       <div key={m} className="flex items-center justify-between gap-2 py-1 text-sm">
         <span className="flex items-center text-text-secondary">
           {t(`metric.${m}`)}
           <Info tKey={`info.metric.${m}`} />
         </span>
-        <span className="font-mono">{val}</span>
+        <span className={`font-mono ${flagged ? "font-semibold text-danger" : ""}`}>
+          {val}
+          {m === "peak_pressure" && meopExceeded && " ⚠"}
+        </span>
       </div>
     );
   };

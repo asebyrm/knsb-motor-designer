@@ -30,15 +30,21 @@ from reportlab.platypus import (
 )
 
 from core.branding import APP_AUTHOR, APP_NAME, DISCLAIMER_SHORT
+from core.export.fonts import register_unicode_fonts
 from core.export.model import MotorExportData
 from core.i18n import t
 
 _PAGE_W, _PAGE_H = A4
 
+# Registered once per process. Falls back to ASCII-only Helvetica if no Unicode
+# TTF is installed, but backend/Dockerfile installs fonts-dejavu-core so the
+# deployed report always has Turkish glyphs (ı, ğ, ş, İ, Ğ, Ş).
+FONT, FONT_BOLD = register_unicode_fonts()
+
 
 def _footer(canvas, doc):
     canvas.saveState()
-    canvas.setFont("Helvetica", 7)
+    canvas.setFont(FONT, 7)
     canvas.setFillColor(colors.grey)
     canvas.drawString(18 * mm, 12 * mm,
                       f"{APP_NAME} - by {APP_AUTHOR}   |   {DISCLAIMER_SHORT}")
@@ -57,7 +63,7 @@ def _logo_flowable(size: float = 34 * mm) -> Drawing:
     d.add(Circle(s * 0.5, s * 0.36, s * 0.22, strokeColor=colors.black, fillColor=None,
                  strokeWidth=1.2))
     d.add(String(s * 0.5, s * 0.33, "KNSB", textAnchor="middle", fontSize=s * 0.11,
-                 fontName="Helvetica-Bold"))
+                 fontName=FONT_BOLD))
     return d
 
 
@@ -71,7 +77,7 @@ def _panel(title: str, x: np.ndarray, y: np.ndarray, w=58 * mm, h=42 * mm) -> Dr
     lp.lines[0].strokeWidth = 1.0
     lp.joinedLines = 1
     d.add(lp)
-    d.add(String(2, h - 9, title, fontSize=7, fontName="Helvetica-Bold"))
+    d.add(String(2, h - 9, title, fontSize=7, fontName=FONT_BOLD))
     return d
 
 
@@ -95,9 +101,10 @@ def render_pdf(
     ])
 
     story = []
-    h1 = styles["Title"]
-    h2 = styles["Heading2"]
-    normal = styles["BodyText"]
+    h1, h2, normal = styles["Title"], styles["Heading2"], styles["BodyText"]
+    for style in (h1, h2, normal, styles["Normal"]):
+        style.fontName = FONT
+    h1.fontName = h2.fontName = FONT_BOLD
 
     # --- cover ---
     story.append(_logo_flowable())
@@ -126,6 +133,8 @@ def render_pdf(
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("FONTNAME", (0, 0), (-1, -1), FONT),
+            ("FONTNAME", (0, 0), (-1, 0), FONT_BOLD),
         ]))
         story.append(tbl)
     story.append(Spacer(1, 6 * mm))
@@ -152,6 +161,8 @@ def render_pdf(
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("FONTNAME", (0, 0), (-1, -1), FONT),
+        ("FONTNAME", (0, 0), (-1, 0), FONT_BOLD),
     ]))
     story.append(rtbl)
     story.append(PageBreak())
@@ -190,6 +201,8 @@ def render_pdf(
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("FONTNAME", (0, 0), (-1, -1), FONT),
+            ("FONTNAME", (0, 0), (-1, 0), FONT_BOLD),
         ]))
         story.append(wtbl)
     else:

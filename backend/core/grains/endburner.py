@@ -45,10 +45,7 @@ class EndBurnerGrain(GrainGeometry):
 
     def validate(self) -> list[Warning]:
         lod = round(self.l / self.d_o, 2)
-        w = [make("WARN_ENDBURNER_THERMAL_SOAK", length_over_diameter=lod)]
-        if self.l / self.d_o > 6.0:
-            w.append(make("WARN_LONG_BURN_THERMAL", length_over_diameter=lod))
-        return w
+        return [make("WARN_ENDBURNER_THERMAL_SOAK", length_over_diameter=lod)]
 
     def cross_section_svg(self, web: float) -> str:
         r_o = 45.0

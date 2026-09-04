@@ -86,9 +86,9 @@ export const MISSION_FIELDS: FieldDef[] = [
 /** Result metrics — must all have metric.<id> + info.metric.<id>. */
 export const METRICS = [
   "total_impulse", "average_thrust", "peak_thrust", "burn_time", "peak_pressure",
-  "specific_impulse", "propellant_mass", "total_mass", "mass_ratio", "designation",
-  "fos", "min_j", "lstar", "thrust_to_weight", "kn", "motor_mass", "inert_mass",
-  "total_length", "cg_initial", "cg_burnout",
+  "meop", "specific_impulse", "propellant_mass", "total_mass", "mass_ratio",
+  "designation", "fos", "min_j", "lstar", "thrust_to_weight", "kn", "motor_mass",
+  "inert_mass", "total_length", "cg_initial", "cg_burnout",
 ] as const;
 
 /** Derived, non-editable measures shown on the drawing — need info.derived.<id>. */
