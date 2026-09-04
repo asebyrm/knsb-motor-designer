@@ -203,6 +203,13 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
 
 /* ------------------------------------------------- longitudinal cross-section */
 
+/**
+ * Schematic longitudinal section in the style of a textbook "solid rocket engine"
+ * diagram: green propellant, dark combustion-chamber cavity, a yellow flame front,
+ * a grey converging-diverging nozzle bell and red exhaust arrows, with leader-line
+ * labels. Still scaled from the real geometry (part x-positions + nozzle angles) and
+ * animated by the web slider.
+ */
 function LongitudinalSVG({
   svgRef,
   parts,
@@ -222,165 +229,265 @@ function LongitudinalSVG({
   if (!parts.length) {
     return <p className="p-4 text-sm text-text-secondary">{t("ui.loading")}</p>;
   }
-  const x0 = Math.min(...parts.map((p) => p.x_start_mm));
-  const x1 = Math.max(...parts.map((p) => p.x_end_mm));
-  const dMax = Math.max(...parts.map((p) => p.outer_diameter_mm));
-
-  const W = 760;
-  const PAD = 74;
-  const drawW = W - 2 * PAD;
-  const spanMm = Math.max(x1 - x0, 1);
-  const scale = drawW / spanMm;
-  const H = Math.round(dMax * scale) + 2 * PAD + 30;
-  const axisY = PAD + (dMax * scale) / 2;
-  const sx = (xmm: number) => PAD + (xmm - x0) * scale;
-  const yR = (rmm: number) => axisY - rmm * scale; // radius -> upper y
-  const ratio = spanMm / drawW;
-  const hatch = layers.hatching ? "url(#hatch)" : "none";
   const g = design.grain;
-  const linerT = design.liner?.thickness ?? 0;
+  const nz = design.nozzle;
 
   const case_ = parts.find((p) => p.name === "case");
-  const liner = parts.find((p) => p.name === "liner");
   const grain = parts.find((p) => p.name === "grain");
   const bh = parts.find((p) => p.name === "bulkhead");
   const nozzle = parts.find((p) => p.name === "nozzle");
+  if (!grain || !nozzle) {
+    return <p className="p-4 text-sm text-text-secondary">{t("ui.loading")}</p>;
+  }
+
+  // --- geometry (mm) --------------------------------------------------------
+  const rCaseO = (case_?.outer_diameter_mm ?? g.outer_diameter * 1000 + 12) / 2;
+  const rCaseI = (case_?.inner_diameter_mm ?? g.outer_diameter * 1000 + 2) / 2;
+  const rBore0 = (g.core_diameter * 1000) / 2;
+  const rBoreNow = (burntCoreDia(g, layers.burnt ? webFraction : 0) * 1000) / 2;
+  const rGrainO = (g.outer_diameter * 1000) / 2;
+
+  const rT = (nz.throat_diameter * 1000) / 2;
+  const rE = rT * Math.sqrt(nz.expansion_ratio);
+  const nozLen = nozzle.x_end_mm - nozzle.x_start_mm;
+  let convLen = Math.max(rCaseI - rT, 0) / Math.tan(deg(nz.convergence_half_angle_deg));
+  let throatLen = nz.throat_length * 1000 || 0.3 * rT;
+  let divLen = Math.max(rE - rT, 0) / Math.tan(deg(nz.divergence_half_angle_deg));
+  const kLen = nozLen / (convLen + throatLen + divLen || 1);
+  convLen *= kLen;
+  throatLen *= kLen;
+  divLen *= kLen;
+
+  const x0 = Math.min(...parts.map((p) => p.x_start_mm));
+  const x1 = Math.max(...parts.map((p) => p.x_end_mm));
+  const dMax = 2 * Math.max(rCaseO, rE);
+
+  // --- canvas -------------------------------------------------------------
+  const W = 760;
+  const PADX = 96;
+  const PADY = 74;
+  const drawW = W - 2 * PADX;
+  const spanMm = Math.max(x1 - x0, 1);
+  const scale = drawW / spanMm;
+  const H = Math.round(dMax * scale) + 2 * PADY;
+  const axisY = PADY + (dMax * scale) / 2;
+  const sx = (xmm: number) => PADX + (xmm - x0) * scale;
+  const yUp = (rmm: number) => axisY - rmm * scale;
+  const yDn = (rmm: number) => axisY + rmm * scale;
+  const ratio = spanMm / drawW;
+
+  const bhX = bh ? bh.x_end_mm : grain.x_start_mm - 6;
+  const gx0 = grain.x_start_mm;
+  const gx1 = grain.x_end_mm;
+  const nx = nozzle.x_start_mm;
+  const pConv = nx + convLen;
+  const pThroat = pConv + throatLen;
+  const pExit = pThroat + divLen;
+
+  const caseStroke = badPart("case") ? "var(--error)" : "currentColor";
+  const grainStroke = badPart("grain") ? "var(--error)" : "var(--propellant-stroke)";
+  const nozStroke = badPart("nozzle") ? "var(--error)" : "var(--nozzle-metal-stroke)";
 
   const els: React.ReactNode[] = [];
-  const stroke = (n: string) => (badPart(n) ? "var(--error)" : "currentColor");
 
-  // helper: a hatched band between two radii over an x range, mirrored about the axis
-  const band = (
-    key: string,
-    xa: number,
-    xb: number,
-    rOuter: number,
-    rInner: number,
-    fill: string,
-    partName: string,
-  ) => {
-    const w = (xb - xa) * scale;
-    const s = stroke(partName);
-    return [
-      <rect key={`${key}-t`} x={sx(xa)} y={yR(rOuter)} width={w} height={(rOuter - rInner) * scale}
-        fill={fill} stroke={s} strokeWidth={1}><title>{partName}</title></rect>,
-      <rect key={`${key}-b`} x={sx(xa)} y={axisY + rInner * scale} width={w}
-        height={(rOuter - rInner) * scale} fill={fill} stroke={s} strokeWidth={1} />,
-    ];
-  };
+  // chamber wall outline (rounded forward end) + dashed nose hint
+  const chamStartX = case_ ? case_.x_start_mm : bhX;
+  els.push(
+    <path key="wall"
+      d={`M ${sx(nx)} ${yUp(rCaseO)} L ${sx(chamStartX + rCaseO * 0.35)} ${yUp(rCaseO)} ` +
+         `Q ${sx(chamStartX)} ${yUp(rCaseO)} ${sx(chamStartX)} ${yUp(rCaseO * 0.5)} ` +
+         `L ${sx(chamStartX)} ${yDn(rCaseO * 0.5)} ` +
+         `Q ${sx(chamStartX)} ${yDn(rCaseO)} ${sx(chamStartX + rCaseO * 0.35)} ${yDn(rCaseO)} ` +
+         `L ${sx(nx)} ${yDn(rCaseO)}`}
+      fill="none" stroke={caseStroke} strokeWidth={2} />,
+    <path key="nose" d={`M ${sx(chamStartX)} ${yUp(rCaseO * 0.5)} L ${sx(x0 - spanMm * 0.05)} ${yUp(0)} ` +
+      `L ${sx(chamStartX)} ${yDn(rCaseO * 0.5)}`}
+      fill="none" stroke="var(--dim-derived)" strokeWidth={1} strokeDasharray="5 4" />,
+  );
 
-  if (layers.axis) {
+  // bulkhead
+  if (bh) {
     els.push(
-      <line key="axis" x1={PAD - 22} y1={axisY} x2={W - PAD + 22} y2={axisY}
-        stroke="var(--axis)" strokeWidth={0.7} strokeDasharray="10 3 2 3" />,
+      <rect key="bh" x={sx(bh.x_start_mm)} y={yUp(rCaseO)} width={(bh.x_end_mm - bh.x_start_mm) * scale}
+        height={rCaseO * 2 * scale} fill="var(--nozzle-metal)" stroke={caseStroke} strokeWidth={1.2} />,
     );
   }
 
-  if (bh) els.push(...band("bh", bh.x_start_mm, bh.x_end_mm, bh.outer_diameter_mm / 2, 0, hatch, "bulkhead"));
-
-  if (case_) {
-    els.push(...band("case", case_.x_start_mm, case_.x_end_mm, case_.outer_diameter_mm / 2,
-      case_.inner_diameter_mm / 2, hatch, "case"));
-  }
-  if (liner && liner.outer_diameter_mm > liner.inner_diameter_mm) {
-    els.push(...band("liner", liner.x_start_mm, liner.x_end_mm, liner.outer_diameter_mm / 2,
-      liner.inner_diameter_mm / 2, "var(--surface-2)", "liner"));
-  }
-
-  // grain: N segments with gaps; burnt bore shown darker
-  if (grain) {
-    const rGrainOuter = (g.outer_diameter * 1000) / 2;
-    const coreNow = (burntCoreDia(g, layers.burnt ? webFraction : 0) * 1000) / 2;
-    const coreInit = (g.core_diameter * 1000) / 2;
-    const n = g.type === "endburner" ? 1 : Math.max(1, g.segment_count);
-    const gapMm = g.type === "bates" ? g.segment_spacing * 1000 : 0;
-    const segMm = g.type === "endburner" || g.type === "tubular"
-      ? grain.x_end_mm - grain.x_start_mm
-      : g.segment_length * 1000;
-    for (let i = 0; i < n; i++) {
-      const xa = grain.x_start_mm + i * (segMm + gapMm);
-      const xb = Math.min(xa + segMm, grain.x_end_mm);
-      els.push(...band(`grain-${i}`, xa, xb, rGrainOuter, coreNow, "var(--grain-fill)", "grain"));
-      if (layers.burnt && coreNow > coreInit) {
-        els.push(...band(`burnt-${i}`, xa, xb, coreNow, coreInit, "var(--burnt-fill)", "grain"));
+  // propellant grain (green) with the burnt zone (grey) and the dark cavity
+  const n = g.type === "endburner" ? 1 : Math.max(1, g.segment_count);
+  const gapMm = g.type === "bates" ? g.segment_spacing * 1000 : 0;
+  const segMm = g.type === "bates" ? g.segment_length * 1000 : gx1 - gx0;
+  for (let i = 0; i < n; i++) {
+    const xa = gx0 + i * (segMm + gapMm);
+    const xb = Math.min(xa + segMm, gx1);
+    const rInner = g.type === "endburner" ? 0 : rBoreNow;
+    const rInner0 = g.type === "endburner" ? 0 : rBore0;
+    const w = (xb - xa) * scale;
+    // green propellant remaining
+    for (const sign of [-1, 1]) {
+      const yA = sign < 0 ? yUp(rGrainO) : yDn(rInner);
+      els.push(
+        <rect key={`prop-${i}-${sign}`} x={sx(xa)} y={yA} width={w} height={(rGrainO - rInner) * scale}
+          fill="var(--propellant)" stroke={grainStroke} strokeWidth={1}>
+          <title>{`${t("drawing.propellant")} · ${design.propellant.id}`}</title>
+        </rect>,
+      );
+      // burnt zone between the initial and current bore
+      if (layers.burnt && rInner > rInner0 + 0.01) {
+        const yB = sign < 0 ? yUp(rInner) : yDn(rInner0);
+        els.push(
+          <rect key={`burnt-${i}-${sign}`} x={sx(xa)} y={yB} width={w}
+            height={(rInner - rInner0) * scale} fill="var(--burnt-zone)" opacity={0.55} />,
+        );
       }
     }
   }
 
-  // nozzle: wall between the C-D flow contour and the nozzle OD
-  if (nozzle) {
-    const nz = design.nozzle;
-    const rT = (nz.throat_diameter * 1000) / 2;
-    const rE = rT * Math.sqrt(nz.expansion_ratio);
-    const rChamRaw = (design.case.inner_diameter / 2 - linerT) * 1000;
-    const rCham = rChamRaw > rT ? rChamRaw : rT * 3;
-    const nozLen = nozzle.x_end_mm - nozzle.x_start_mm;
-    let convLen = Math.max(rCham - rT, 0) / Math.tan(deg(nz.convergence_half_angle_deg));
-    let divLen = Math.max(rE - rT, 0) / Math.tan(deg(nz.divergence_half_angle_deg));
-    let throatLen = nz.throat_length * 1000 || 0.3 * rT;
-    // keep the three segments within the part's actual axial length
-    const sumLen = convLen + throatLen + divLen || 1;
-    const kLen = nozLen / sumLen;
-    convLen *= kLen;
-    throatLen *= kLen;
-    divLen *= kLen;
-    const nx = nozzle.x_start_mm;
-    const rOD = nozzle.outer_diameter_mm / 2;
-    const p1 = nx;
-    const p2 = nx + convLen;
-    const p3 = p2 + throatLen;
-    const p4 = p3 + divLen;
-    const s = stroke("nozzle");
-    // top wall: outer edge across, then inner contour back
-    const top = `M ${sx(p1)} ${yR(rOD)} L ${sx(p4)} ${yR(rOD)} L ${sx(p4)} ${yR(rE)} ` +
-      `L ${sx(p3)} ${yR(rT)} L ${sx(p2)} ${yR(rT)} L ${sx(p1)} ${yR(rCham)} Z`;
-    const bot = `M ${sx(p1)} ${axisY + rOD * scale} L ${sx(p4)} ${axisY + rOD * scale} ` +
-      `L ${sx(p4)} ${axisY + rE * scale} L ${sx(p3)} ${axisY + rT * scale} ` +
-      `L ${sx(p2)} ${axisY + rT * scale} L ${sx(p1)} ${axisY + rCham * scale} Z`;
+  // nozzle metal (grey) — smooth converging-diverging bell drawn as a solid shell
+  const wallT = Math.max(rT * 0.7, 4);
+  const wallE = Math.max(rE * 0.4, 4);
+  const cLen = pThroat - nx; // convergent length
+  const dLen = pExit - pThroat; // divergent length
+  const bell = (yy: (r: number) => number) =>
+    // outer: hug the case OD briefly, curve down to the throat, then flare (bell)
+    `M ${sx(nx)} ${yy(rCaseO)} ` +
+    `L ${sx(nx + cLen * 0.3)} ${yy(rCaseO * 0.94)} ` +
+    `Q ${sx(pThroat - cLen * 0.2)} ${yy(rT + wallT)} ${sx(pThroat)} ${yy(rT + wallT)} ` +
+    `C ${sx(pThroat + dLen * 0.3)} ${yy(rT + wallT)} ${sx(pExit - dLen * 0.15)} ${yy(rE + wallE)} ` +
+    `${sx(pExit)} ${yy(rE + wallE)} ` +
+    // exit lip down to the flow surface
+    `L ${sx(pExit)} ${yy(rE)} ` +
+    // inner: divergent cone back to the throat, then convergent curve to the chamber bore
+    `C ${sx(pExit - dLen * 0.15)} ${yy(rE)} ${sx(pThroat + dLen * 0.3)} ${yy(rT)} ${sx(pThroat)} ${yy(rT)} ` +
+    `Q ${sx(nx + cLen * 0.35)} ${yy(rCaseI * 0.9)} ${sx(nx)} ${yy(rCaseI)} Z`;
+  els.push(
+    <path key="noz-top" d={bell(yUp)} fill="var(--nozzle-metal)" stroke={nozStroke} strokeWidth={1.4}>
+      <title>{t("drawing.nozzle")}</title>
+    </path>,
+    <path key="noz-bot" d={bell(yDn)} fill="var(--nozzle-metal)" stroke={nozStroke} strokeWidth={1.4} />,
+  );
+
+  // combustion-chamber cavity (dark) — bore through the grain and the nozzle flow path,
+  // drawn ON TOP of the nozzle so the flow channel reads as an opening
+  const rCav = rBoreNow || rT;
+  els.push(
+    <path key="cavity"
+      d={`M ${sx(bhX)} ${yUp(rCav)} L ${sx(nx)} ${yUp(rCav)} ` +
+         `Q ${sx(nx + cLen * 0.35)} ${yUp(rCav)} ${sx(pThroat)} ${yUp(rT)} ` +
+         `C ${sx(pThroat + dLen * 0.3)} ${yUp(rT)} ${sx(pExit - dLen * 0.15)} ${yUp(rE)} ` +
+         `${sx(pExit)} ${yUp(rE)} ` +
+         `L ${sx(pExit)} ${yDn(rE)} ` +
+         `C ${sx(pExit - dLen * 0.15)} ${yDn(rE)} ${sx(pThroat + dLen * 0.3)} ${yDn(rT)} ` +
+         `${sx(pThroat)} ${yDn(rT)} ` +
+         `Q ${sx(nx + cLen * 0.35)} ${yDn(rCav)} ${sx(nx)} ${yDn(rCav)} L ${sx(bhX)} ${yDn(rCav)} Z`}
+      fill="var(--cavity)" />,
+  );
+
+  // flame front (yellow) — the burning surfaces
+  if (g.type !== "endburner") {
+    for (const sign of [-1, 1]) {
+      const y = sign < 0 ? yUp(rBoreNow) : yDn(rBoreNow);
+      els.push(
+        <line key={`flame-core-${sign}`} x1={sx(gx0)} y1={y} x2={sx(gx1)} y2={y}
+          stroke="var(--flame)" strokeWidth={2.5} />,
+      );
+    }
+    // segment end faces
+    if (g.type === "bates") {
+      for (let i = 0; i < n; i++) {
+        const xa = gx0 + i * (segMm + gapMm);
+        const xb = Math.min(xa + segMm, gx1);
+        for (const xf of [xa, xb]) {
+          els.push(
+            <line key={`flame-face-${i}-${xf}`} x1={sx(xf)} y1={yUp(rBoreNow)} x2={sx(xf)}
+              y2={yUp(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
+            <line key={`flame-faceb-${i}-${xf}`} x1={sx(xf)} y1={yDn(rBoreNow)} x2={sx(xf)}
+              y2={yDn(rGrainO)} stroke="var(--flame)" strokeWidth={2} />,
+          );
+        }
+      }
+    }
+  } else {
+    // end-burner: a transverse flame face that recedes
+    const xf = gx0 + webFraction * (gx1 - gx0);
     els.push(
-      <path key="noz-t" d={top} fill={hatch} stroke={s} strokeWidth={1}><title>nozzle</title></path>,
-      <path key="noz-b" d={bot} fill={hatch} stroke={s} strokeWidth={1} />,
-      <line key="noz-cl-t" x1={sx(p1)} y1={yR(rCham)} x2={sx(p2)} y2={yR(rT)}
-        stroke={s} strokeWidth={0.6} opacity={0.5} />,
+      <line key="flame-eb" x1={sx(xf)} y1={yUp(rGrainO)} x2={sx(xf)} y2={yDn(rGrainO)}
+        stroke="var(--flame)" strokeWidth={3} />,
     );
   }
 
+  // exhaust arrows
+  for (const fr of [-0.55, 0, 0.55]) {
+    const y = axisY + fr * rE * scale;
+    const x = sx(pExit) + 6;
+    els.push(
+      <g key={`ex-${fr}`} stroke="var(--exhaust)" strokeWidth={2.4} fill="var(--exhaust)">
+        <line x1={x} y1={y} x2={x + 34} y2={y} />
+        <path d={`M ${x + 34} ${y} l -7 -4 v 8 z`} />
+      </g>,
+    );
+  }
+
+  if (layers.axis) {
+    els.push(
+      <line key="axis" x1={sx(x0) - 24} y1={axisY} x2={sx(pExit) + 52} y2={axisY}
+        stroke="var(--axis)" strokeWidth={0.7} strokeDasharray="10 3 2 3" />,
+    );
+  }
+
+  // labels with leader lines
   if (layers.part_names) {
-    for (const p of parts) {
-      els.push(
-        <text key={`name-${p.name}`} x={sx((p.x_start_mm + p.x_end_mm) / 2)} y={axisY + 3.5}
-          textAnchor="middle" fontSize={9} fill="var(--dim-derived)">{p.name}</text>,
-      );
+    const label = (
+      key: string,
+      lx: number,
+      ly: number,
+      tx: number,
+      ty: number,
+      text: string,
+      anchor: "start" | "middle" | "end" = "middle",
+    ) => (
+      <g key={key} fontSize={11} fill="var(--text)">
+        <line x1={lx} y1={ly} x2={tx} y2={ty} stroke="var(--dim-derived)" strokeWidth={0.7} />
+        <circle cx={lx} cy={ly} r={1.6} fill="var(--dim-derived)" />
+        <text x={tx} y={ty + (ty < axisY ? -3 : 11)} textAnchor={anchor}>{text}</text>
+      </g>
+    );
+    els.push(
+      label("l-prop", sx(gx0 + (gx1 - gx0) * 0.15), yUp((rGrainO + rBoreNow) / 2),
+        sx(gx0 + (gx1 - gx0) * 0.05), PADY - 14, `${t("drawing.propellant")} (${design.propellant.id})`,
+        "start"),
+      label("l-flame", sx(gx0 + (gx1 - gx0) * 0.66), yUp(rBoreNow),
+        sx(gx1 - (gx1 - gx0) * 0.1), PADY - 32, t("drawing.flame_front")),
+      label("l-chamber", sx(gx0 + (gx1 - gx0) * 0.5), yDn(rCav * 0.6),
+        sx(gx0 + (gx1 - gx0) * 0.42), H - PADY + 18, t("drawing.chamber")),
+      label("l-throat", sx(pThroat), yDn(rT + wallT), sx(pThroat + 8), H - PADY + 34,
+        t("drawing.throat")),
+      label("l-nozzle", sx(pThroat + (pExit - pThroat) * 0.5), yUp(rE + wallE),
+        sx(pThroat + (pExit - pThroat) * 0.5), PADY - 14, t("drawing.nozzle")),
+      label("l-exhaust", sx(pExit) + 34, axisY - rE * scale * 0.55, sx(pExit) + 52, PADY - 14,
+        t("drawing.exhaust"), "end"),
+    );
+    if (bh) {
+      els.push(label("l-bh", sx((bh.x_start_mm + bh.x_end_mm) / 2), yDn(rCaseO * 0.6),
+        sx(x0 - spanMm * 0.03), H - PADY + 34, t("drawing.bulkhead"), "start"));
     }
   }
 
   if (layers.dimensions) {
     els.push(
-      <DimLine key="ltot" x1={sx(x0)} x2={sx(x1)} y={PAD - 40}
+      <DimLine key="ltot" x1={sx(x0)} x2={sx(x1)} y={PADY - 46}
         label={`L_total ${(x1 - x0).toFixed(1)} mm`} derived />,
-      <DimLine key="dmax" x1={sx(x1) + 16} x2={sx(x1) + 16} y={yR(dMax / 2)} y2={axisY + (dMax / 2) * scale}
-        vertical label={`D ${dMax.toFixed(1)} mm`} />,
+      <DimLine key="dmax" x1={sx(pExit) + 24} x2={sx(pExit) + 24} y={yUp(rCaseO)} y2={yDn(rCaseO)}
+        vertical label={`D ${(rCaseO * 2).toFixed(1)} mm`} />,
     );
-    if (grain) {
-      els.push(
-        <DimLine key="gl" x1={sx(grain.x_start_mm)} x2={sx(grain.x_end_mm)}
-          y={yR(g.outer_diameter * 500) - 16}
-          label={`grain ${(grain.x_end_mm - grain.x_start_mm).toFixed(1)} mm`} />,
-      );
-    }
   }
 
   return (
     <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`}
       className="min-w-[700px]" style={{ color: "var(--text)" }}>
-      <defs>
-        <pattern id="hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-          <line x1="0" y1="0" x2="0" y2="6" stroke="var(--border)" strokeWidth="1" />
-        </pattern>
-      </defs>
       {els}
-      <text x={PAD} y={H - 8} fontSize={11} fill="var(--dim-derived)">
-        {t("ui.scale")} 1 : {ratio.toFixed(2)} · {t("ui.derived_value")}
+      <text x={PADX} y={H - 6} fontSize={11} fill="var(--dim-derived)">
+        {t("ui.scale")} 1 : {ratio.toFixed(2)}
       </text>
     </svg>
   );
@@ -410,33 +517,33 @@ function TransverseSVG({
   const rGrainO = g.outer_diameter / 2;
   const rCore = burntCoreDia(g, webFraction) / 2;
   const rCoreInit = g.core_diameter / 2;
-  const k = (c - 14) / rCaseO; // scale m -> px
-  const ring = (r: number, fill: string, s: string, sw = 1) => (
-    <circle cx={c} cy={c} r={r * k} fill={fill} stroke={s} strokeWidth={sw} />
+  const k = (c - 16) / rCaseO; // scale m -> px
+  const ring = (r: number, fill: string, s: string, sw = 1, dash?: string) => (
+    <circle cx={c} cy={c} r={r * k} fill={fill} stroke={s} strokeWidth={sw} strokeDasharray={dash} />
   );
+  const caseS = badPart("case") ? "var(--error)" : "currentColor";
   return (
     <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${S} ${S}`}
-      className="mx-auto block max-h-[340px]" style={{ color: "var(--text)" }}>
-      {ring(rCaseO, "url(#hatch2)", badPart("case") ? "var(--error)" : "currentColor", 1.3)}
-      {ring(rCaseI, "var(--surface)", badPart("case") ? "var(--error)" : "currentColor")}
+      className="mx-auto block max-h-[360px]" style={{ color: "var(--text)" }}>
+      {/* case wall */}
+      {ring(rCaseO, "var(--nozzle-metal)", caseS, 1.3)}
+      {ring(rCaseI, "var(--surface)", caseS)}
+      {/* liner */}
       {linerT > 0 &&
         ring(rLinerI, "var(--surface-2)", badPart("liner") ? "var(--error)" : "currentColor")}
-      {ring(
-        rGrainO,
-        "var(--grain-fill)",
-        badPart("grain") ? "var(--error)" : "currentColor",
-        badPart("grain") ? 1.6 : 1,
+      {/* propellant (green) */}
+      {ring(rGrainO, "var(--propellant)",
+        badPart("grain") ? "var(--error)" : "var(--propellant-stroke)", badPart("grain") ? 1.8 : 1.2)}
+      {/* burnt zone + dark cavity */}
+      {g.type !== "endburner" && rCore > rCoreInit + 1e-9 && ring(rCore, "var(--burnt-zone)", "none")}
+      {g.type !== "endburner" && rCore > 0 && ring(rCore, "var(--cavity)", "none")}
+      {/* flame front at the bore */}
+      {g.type !== "endburner" && (
+        <circle cx={c} cy={c} r={rCore * k} fill="none" stroke="var(--flame)" strokeWidth={2.5} />
       )}
-      {g.type !== "endburner" && rCore > 0 && ring(rCore, "var(--burnt-fill)", "none")}
-      {g.type !== "endburner" && rCore > rCoreInit + 1e-9 && (
-        <circle cx={c} cy={c} r={rCoreInit * k} fill="none" stroke="currentColor"
-          strokeDasharray="2 2" strokeWidth={0.8} opacity={0.5} />
-      )}
-      <defs>
-        <pattern id="hatch2" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-          <line x1="0" y1="0" x2="0" y2="7" stroke="var(--border)" strokeWidth="1" />
-        </pattern>
-      </defs>
+      {/* initial bore, dashed */}
+      {g.type !== "endburner" && rCore > rCoreInit + 1e-9 &&
+        ring(rCoreInit, "none", "currentColor", 0.8, "2 2")}
       <text x={c} y={S - 6} textAnchor="middle" fontSize={11} fill="var(--dim-derived)">
         {t("ui.section_transverse")} · D_case {(rCaseO * 2000).toFixed(1)} mm
       </text>

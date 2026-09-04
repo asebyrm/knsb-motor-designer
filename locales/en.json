@@ -58,6 +58,20 @@
     "disclaimer_title": "Before you continue",
     "disclaimer_accept": "I understand"
   },
+  "drawing": {
+    "propellant": "Propellant",
+    "flame_front": "Flame front",
+    "chamber": "Combustion chamber",
+    "nozzle": "Nozzle",
+    "throat": "Throat",
+    "exit": "Exit",
+    "exhaust": "Exhaust",
+    "bulkhead": "Bulkhead",
+    "case": "Case",
+    "burnt": "Burnt",
+    "view_schematic": "Schematic",
+    "view_technical": "Technical"
+  },
   "nav": {
     "designer": "Designer",
     "mission": "Quick altitude estimate",

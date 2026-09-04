@@ -15,10 +15,11 @@ const LB = 0.45359237;
 const PSI = 6894.757293168;
 
 export const CONV: Record<UnitKind, Conv> = {
+  // SI base is METRES; shown as mm (metric) / inch (imperial)
   length_mm: {
     label: (s) => (s === "imperial" ? "in" : "mm"),
-    toDisplay: (si, s) => (s === "imperial" ? si / IN : si),
-    fromDisplay: (d, s) => (s === "imperial" ? d * IN : d),
+    toDisplay: (si, s) => (s === "imperial" ? (si * 1000) / IN : si * 1000),
+    fromDisplay: (d, s) => (s === "imperial" ? (d * IN) / 1000 : d / 1000),
     digits: 2,
   },
   length_m: {

@@ -58,6 +58,20 @@
     "disclaimer_title": "Devam etmeden önce",
     "disclaimer_accept": "Anladım"
   },
+  "drawing": {
+    "propellant": "Yakıt",
+    "flame_front": "Alev cephesi",
+    "chamber": "Yanma odası",
+    "nozzle": "Nozzle",
+    "throat": "Boğaz",
+    "exit": "Çıkış",
+    "exhaust": "Egzoz",
+    "bulkhead": "Kapak (bulkhead)",
+    "case": "Case",
+    "burnt": "Yanmış",
+    "view_schematic": "Şematik",
+    "view_technical": "Teknik"
+  },
   "nav": {
     "designer": "Tasarım",
     "mission": "Hızlı irtifa tahmini",
