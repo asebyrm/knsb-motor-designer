@@ -10,28 +10,34 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useStore } from "../store";
+
 /* ---------------------------------------------------------------- Info tooltip */
 /* Section 9: appears on ~400 ms hover, on focus, and on tapping the ? icon.
-   Bound with aria-describedby; never blocks typing. */
+   The text is shown in a shared bar in the centre of the header (<TipBar/>) so it
+   is never clipped by a scrolling panel. A visually-hidden span keeps
+   aria-describedby working for screen readers; typing is never blocked. */
 
 export function Info({ tKey }: { tKey: string }) {
   const { t, i18n } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const setTip = useStore((s) => s.setTip);
   const timer = useRef<number | undefined>(undefined);
   const id = useId();
   const text = t(tKey);
   // missing key -> render nothing rather than leak the raw key
   if (text === tKey) return null;
 
-  const show = () => setOpen(true);
-  const hide = () => setOpen(false);
+  const show = () => {
+    window.clearTimeout(timer.current);
+    setTip(text);
+  };
+  const hide = () => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setTip(null), 120);
+  };
   const delayed = () => {
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(show, 400);
-  };
-  const cancel = () => {
-    window.clearTimeout(timer.current);
-    hide();
+    timer.current = window.setTimeout(() => setTip(text), 400);
   };
 
   return (
@@ -39,28 +45,40 @@ export function Info({ tKey }: { tKey: string }) {
       <button
         type="button"
         aria-label={i18n.language === "tr" ? "Bilgi" : "Info"}
-        aria-describedby={open ? id : undefined}
+        aria-describedby={id}
         className="ml-1 h-4 w-4 shrink-0 rounded-full border border-border text-[10px]
-                   leading-none text-text-secondary hover:bg-surface-2"
+                   leading-none text-text-secondary hover:bg-primary hover:text-primary-fg
+                   focus:outline-none focus:ring-1 focus:ring-primary"
         onMouseEnter={delayed}
-        onMouseLeave={cancel}
+        onMouseLeave={hide}
         onFocus={show}
         onBlur={hide}
-        onClick={() => setOpen((o) => !o)}
+        onClick={show}
       >
         ?
       </button>
-      {open && (
-        <span
-          role="tooltip"
-          id={id}
-          className="absolute left-5 top-0 z-50 w-64 rounded-md border border-border
-                     bg-surface p-2 text-xs leading-snug text-text shadow-lg"
-        >
-          {text}
-        </span>
-      )}
+      <span id={id} className="sr-only">
+        {text}
+      </span>
     </span>
+  );
+}
+
+/* Shared display area — mount once in the header. */
+export function TipBar() {
+  const tip = useStore((s) => s.tip);
+  return (
+    <div
+      className="pointer-events-none flex min-h-[1.75rem] w-full items-center justify-center px-4"
+      aria-live="polite"
+    >
+      {tip && (
+        <p className="max-w-3xl rounded-md border border-border bg-surface-2 px-3 py-1
+                      text-center text-xs leading-snug text-text shadow-sm">
+          {tip}
+        </p>
+      )}
+    </div>
   );
 }
 

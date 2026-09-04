@@ -22,7 +22,9 @@ def health() -> dict:
 def catalog() -> dict:
     """Everything the frontend needs to populate dropdowns and validate tooltips."""
     props = []
-    for pid in available_propellants():
+    # KNSB is the v1 primary fuel — list it first, then the rest alphabetically
+    ordered = sorted(available_propellants(), key=lambda pid: (pid != "knsb", pid))
+    for pid in ordered:
         p = load_propellant(pid)
         props.append({
             "id": p.id, "file": pid, "name_tr": p.name_tr, "name_en": p.name_en,

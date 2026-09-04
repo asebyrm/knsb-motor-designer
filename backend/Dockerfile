@@ -12,11 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential libpq5 curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/pyproject.toml backend/README.md ./backend/
-RUN pip install --upgrade pip && pip install -e "./backend[api]"
-
 COPY backend/ ./backend/
 COPY locales/ ./locales/
+RUN pip install --upgrade pip && pip install -e "./backend[api]"
 
 WORKDIR /app/backend
 ENV LOCALES_DIR=/app/locales \

@@ -82,6 +82,7 @@ interface AppState {
   theme: "light" | "dark";
   webFraction: number;
   lastResult: SimResult | null;
+  tip: string | null;
   user: Record<string, unknown> | null;
   setField: (path: string, value: unknown) => void;
   setDesign: (d: DesignDoc) => void;
@@ -90,6 +91,7 @@ interface AppState {
   setTheme: (t: "light" | "dark") => void;
   setWebFraction: (f: number) => void;
   setLastResult: (r: SimResult | null) => void;
+  setTip: (t: string | null) => void;
   setUser: (u: Record<string, unknown> | null, token?: string | null) => void;
 }
 
@@ -101,6 +103,7 @@ export const useStore = create<AppState>((set, get) => ({
     (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
   webFraction: 0,
   lastResult: null,
+  tip: null,
   user: null,
   setField: (path, value) => {
     const design = clone(get().design);
@@ -127,6 +130,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setWebFraction: (webFraction) => set({ webFraction }),
   setLastResult: (lastResult) => set({ lastResult }),
+  setTip: (tip) => set({ tip }),
   setUser: (user, token) => {
     if (token !== undefined) {
       if (token) localStorage.setItem(LS_TOKEN, token);
