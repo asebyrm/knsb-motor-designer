@@ -30,7 +30,7 @@ export function Topbar({
           className="flex items-center gap-3 text-text"
           onClick={() => setView("designer")}
         >
-          <Logo size={88} />
+          <Logo size={132} />
           <span className="text-xl font-semibold">KNSB Motor Designer</span>
         </button>
 

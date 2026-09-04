@@ -94,3 +94,19 @@ export function fmtMetricValue(id: string, value: number, s: UnitSystem, locale:
       return typeof value === "number" ? nf(value, 2) : String(value);
   }
 }
+
+/** Units that can never go negative in the real world (lengths, masses). Fields
+ * bound to these must reject/clamp a typed-in negative value instead of storing
+ * a physically meaningless size. */
+const NON_NEGATIVE_UNITS: ReadonlySet<UnitKind> = new Set([
+  "length_mm", "length_m", "mass_kg", "count",
+]);
+
+export function isNonNegativeUnit(unit: UnitKind): boolean {
+  return NON_NEGATIVE_UNITS.has(unit);
+}
+
+/** Clamp a value typed in a field's display unit to a physically valid minimum. */
+export function clampForUnit(displayValue: number, unit: UnitKind): number {
+  return isNonNegativeUnit(unit) ? Math.max(0, displayValue) : displayValue;
+}

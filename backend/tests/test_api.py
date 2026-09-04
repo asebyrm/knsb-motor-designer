@@ -106,6 +106,22 @@ def test_export_endpoint_and_lock(api_client, sample_design):
     assert forced.status_code == 200
 
 
+def test_export_filename_with_turkish_characters(api_client, sample_design):
+    """A design name with Turkish letters (İ, ş, ğ...) must not crash the
+    Content-Disposition header - it's outside latin-1, so it has to be
+    transliterated for `filename=` and UTF-8 percent-encoded for `filename*=`
+    rather than passed through raw (regression: was a 500)."""
+    for fmt in ("pdf", "eng", "csv", "json"):
+        design = {**sample_design, "name": "İTÜ PARS Referans Motoru"}
+        r = api_client.post("/api/export", json={"design": design, "fmt": fmt,
+                                                   "accept_risk": True})
+        assert r.status_code == 200, r.text
+        cd = r.headers["content-disposition"]
+        assert "attachment" in cd
+        assert "İ" not in cd.split("filename*=")[0]  # ascii-safe fallback stays ascii
+        assert "filename*=UTF-8''" in cd
+
+
 def test_mission_job_lifecycle(api_client):
     r = api_client.post("/api/mission", json={
         "dry_mass": 6.0, "body_diameter": 0.10, "target_apogee": 800.0,

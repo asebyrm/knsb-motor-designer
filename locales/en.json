@@ -14,6 +14,8 @@
     "compare": "Compare",
     "units_metric": "Metric",
     "units_imperial": "Imperial",
+    "on": "On",
+    "off": "Off",
     "theme": "Theme",
     "language": "Language",
     "close": "Close",
@@ -70,6 +72,7 @@
     "exhaust": "Exhaust",
     "bulkhead": "Bulkhead",
     "case": "Case",
+    "liner": "Liner",
     "burnt": "Burnt",
     "view_schematic": "Schematic",
     "view_technical": "Technical"

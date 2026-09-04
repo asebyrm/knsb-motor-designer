@@ -16,3 +16,17 @@ export const PREVIEW_LAYERS = {
   axis: true,
   burnt: true,
 };
+
+/** One distinct drawing color per liner material (backend/data/materials/liner_materials.yaml
+ * IDs), so the liner band reads as the chosen material rather than a generic grey. */
+export const LINER_COLORS: Record<string, string> = {
+  kraft_phenolic: "#a97c46",
+  cardboard: "#c9a066",
+  graphite: "#3a3a3d",
+  ceramic_blanket: "#e3dac9",
+  sand_epoxy: "#c2a878",
+};
+
+export function linerColor(materialId?: string | null): string {
+  return (materialId && LINER_COLORS[materialId]) || "var(--surface-2)";
+}

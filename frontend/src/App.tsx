@@ -62,7 +62,7 @@ export default function App() {
 
       <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-surface px-3 py-2 text-xs text-text-secondary">
         <span className="flex items-center gap-1.5">
-          <Logo size={44} variant="mark" /> KNSB Motor Designer
+          <Logo size={66} variant="mark" /> KNSB Motor Designer
         </span>
         <span className="flex items-center gap-3">
           <a

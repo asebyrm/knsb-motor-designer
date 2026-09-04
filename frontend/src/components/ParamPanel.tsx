@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import type { Catalog } from "../api";
-import { CONV } from "../lib/units";
+import { clampForUnit, CONV, isNonNegativeUnit } from "../lib/units";
 import { FIELDS, type FieldDef } from "../lib/registry";
 import { getPath, useStore } from "../store";
 import { Accordion, AccordionItem, Info } from "./ui";
@@ -35,14 +35,23 @@ export function FieldRow({
 
   let control: React.ReactNode;
   if (field.kind === "bool") {
+    const on = Boolean(raw);
     control = (
-      <input
-        type="checkbox"
-        className="h-4 w-4"
-        checked={Boolean(raw)}
-        onChange={(e) => setField(field.path, e.target.checked)}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
         aria-label={label}
-      />
+        onClick={() => setField(field.path, !on)}
+        className={
+          "rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " +
+          (on
+            ? "bg-primary text-primary-fg"
+            : "border border-border bg-surface text-text-secondary hover:bg-surface-2")
+        }
+      >
+        {on ? t("ui.on") : t("ui.off")}
+      </button>
     );
   } else if (field.kind === "select") {
     let options = field.options ?? [];
@@ -75,9 +84,14 @@ export function FieldRow({
           className="input"
           value={displayVal}
           step={field.step}
+          min={isNonNegativeUnit(field.unit) ? 0 : undefined}
           onChange={(e) => {
-            const v = e.target.value === "" ? null : conv.fromDisplay(Number(e.target.value), units);
-            setField(field.path, v);
+            if (e.target.value === "") {
+              setField(field.path, null);
+              return;
+            }
+            const clamped = clampForUnit(Number(e.target.value), field.unit);
+            setField(field.path, conv.fromDisplay(clamped, units));
           }}
           aria-label={label}
         />
@@ -117,9 +131,14 @@ export function ParamPanel({
     <Accordion defaultOpen={["propellant", "grain", "nozzle", "case"]}>
       {GROUP_ORDER.filter((g) => byGroup.has(g)).map((g) => (
         <AccordionItem key={g} id={g} title={t(`group.${g}`)}>
-          {byGroup.get(g)!.map((f) => (
-            <FieldRow key={f.id} field={f} catalog={catalog} />
-          ))}
+          {byGroup.get(g)!.map((f) => {
+            const hideErosionDetail =
+              g === "nozzle" &&
+              (f.id === "erosion_coefficient" || f.id === "erosion_exponent") &&
+              !design.nozzle.erosion.enabled;
+            if (hideErosionDetail) return null;
+            return <FieldRow key={f.id} field={f} catalog={catalog} />;
+          })}
           {g === "grain" && design.grain.type === "bates" && (
             <div className="mt-1 flex items-center">
               <button

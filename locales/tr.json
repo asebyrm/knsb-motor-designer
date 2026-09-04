@@ -14,6 +14,8 @@
     "compare": "Karşılaştır",
     "units_metric": "Metrik",
     "units_imperial": "Imperial",
+    "on": "Açık",
+    "off": "Kapalı",
     "theme": "Tema",
     "language": "Dil",
     "close": "Kapat",
@@ -70,6 +72,7 @@
     "exhaust": "Egzoz",
     "bulkhead": "Kapak (bulkhead)",
     "case": "Case",
+    "liner": "Liner",
     "burnt": "Yanmış",
     "view_schematic": "Şematik",
     "view_technical": "Teknik"

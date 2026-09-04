@@ -61,11 +61,15 @@ export function Charts({ result, webFraction }: { result: SimResult; webFraction
             <CartesianGrid stroke="var(--border)" strokeDasharray="2 3" />
             <XAxis
               dataKey="t"
+              type="number"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={(v) => Number(v).toFixed(2)}
               tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
               stroke="var(--border)"
               label={{ value: t("chart.time") + " (s)", position: "insideBottom", fontSize: 10 }}
             />
             <YAxis
+              tickFormatter={(v) => Number(v).toFixed(2)}
               tick={{ fontSize: 10, fill: "var(--text-secondary)" }}
               stroke="var(--border)"
               width={48}

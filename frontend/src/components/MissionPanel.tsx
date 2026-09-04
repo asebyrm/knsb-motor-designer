@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../api";
-import { CONV } from "../lib/units";
+import { clampForUnit, CONV, isNonNegativeUnit } from "../lib/units";
 import { MISSION_FIELDS } from "../lib/registry";
 import { useStore } from "../store";
 import type { MissionCandidate, MissionResult } from "../types";
@@ -125,13 +125,15 @@ export function MissionPanel() {
                   type="number"
                   className="input"
                   step={f.step}
+                  min={isNonNegativeUnit(f.unit) ? 0 : undefined}
                   value={Number(conv.toDisplay(vals[f.id] ?? 0, units).toFixed(3))}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const clamped = clampForUnit(Number(e.target.value), f.unit);
                     setVals((v) => ({
                       ...v,
-                      [f.id]: conv.fromDisplay(Number(e.target.value), units),
-                    }))
-                  }
+                      [f.id]: conv.fromDisplay(clamped, units),
+                    }));
+                  }}
                 />
                 <span className="w-8 text-text-secondary">{conv.label(units)}</span>
               </div>

@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { api } from "../api";
-import { PART_FIT_CODES } from "../lib/drawing";
-import { CONV } from "../lib/units";
+import { api, ApiError } from "../api";
+import { linerColor } from "../lib/drawing";
+import { clampForUnit, CONV, isNonNegativeUnit } from "../lib/units";
 import { useStore } from "../store";
 import type { DesignDoc, SimResult } from "../types";
 import { Info } from "./ui";
@@ -36,23 +36,10 @@ function burntCoreDia(g: DesignDoc["grain"], frac: number): number {
 
 export function EngineCrossSection({ result }: { result: SimResult | undefined }) {
   const { t, i18n } = useTranslation();
-  const { design, units, setField, webFraction } = useStore();
-  const svgRef = useRef<SVGSVGElement>(null);
+  const { design, units, setField } = useStore();
   const [editing, setEditing] = useState<string | null>(null);
-  const [section, setSection] = useState<"long" | "trans">("long");
   const [pdfBusy, setPdfBusy] = useState(false);
-  const [layers, setLayers] = useState({
-    dimensions: true,
-    part_names: true,
-    hatching: true,
-    axis: true,
-    burnt: true,
-  });
-
-  const parts = useMemo(() => result?.assembly.parts ?? [], [result]);
-  const fitCodes = new Set((result?.assembly.fit_warnings ?? []).map((w) => w.code));
-  const badPart = (name: string) =>
-    (PART_FIT_CODES[name] ?? []).some((c) => fitCodes.has(c));
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const g = design.grain;
   const noz = design.nozzle;
@@ -79,74 +66,37 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
 
   function commit(row: DimRow, displayValue: string) {
     if (!row.path) return;
-    const raw = Number(displayValue);
+    const raw = clampForUnit(Number(displayValue), row.unit);
     setField(row.path, row.unit === "count" ? Math.round(raw) : CONV[row.unit].fromDisplay(raw, units));
     setEditing(null);
   }
 
   async function downloadPdf() {
     setPdfBusy(true);
+    setPdfError(null);
     try {
-      await api.exportFile(design, "pdf", i18n.language === "tr" ? "tr" : "en", false);
+      await api.exportFile(design, "pdf", i18n.language === "tr" ? "tr" : "en", true);
+    } catch (e) {
+      setPdfError(e instanceof ApiError ? e.message || String(e.status) : String(e));
     } finally {
       setPdfBusy(false);
     }
   }
 
-  const drawing =
-    section === "long" ? (
-      <LongitudinalSVG
-        svgRef={svgRef}
-        parts={parts}
-        design={design}
-        webFraction={webFraction}
-        layers={layers}
-        badPart={badPart}
-      />
-    ) : (
-      <TransverseSVG svgRef={svgRef} design={design} webFraction={webFraction} badPart={badPart} />
-    );
-
   return (
     <div className="space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold">{t("ui.technical_report")}</h2>
-        <p className="text-xs text-text-secondary">{t("ui.technical_report_hint")}</p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        <div className="flex overflow-hidden rounded-md border border-border">
-          {(["long", "trans"] as const).map((s) => (
-            <button
-              key={s}
-              className={
-                "px-2 py-1 " +
-                (section === s ? "bg-primary text-primary-fg" : "text-text-secondary")
-              }
-              onClick={() => setSection(s)}
-            >
-              {t(s === "long" ? "ui.section_longitudinal" : "ui.section_transverse")}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">{t("ui.technical_report")}</h2>
+          <p className="text-xs text-text-secondary">{t("ui.technical_report_hint")}</p>
         </div>
-        {(["dimensions", "part_names", "hatching", "axis", "burnt"] as const).map((k) => (
-          <label key={k} className="flex items-center gap-1">
-            <input
-              type="checkbox"
-              checked={layers[k]}
-              onChange={(e) => setLayers((s) => ({ ...s, [k]: e.target.checked }))}
-            />
-            {t(`ui.layer_${k}`)}
-          </label>
-        ))}
-        <span className="ml-auto flex items-center gap-2">
+        <div className="text-right">
           <button className="btn-primary text-xs" onClick={downloadPdf} disabled={pdfBusy}>
             {pdfBusy ? t("ui.recalculating") : t("ui.download_pdf_report")}
           </button>
-        </span>
+          {pdfError && <p className="mt-1 max-w-xs text-xs text-danger">{pdfError}</p>}
+        </div>
       </div>
-
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface">{drawing}</div>
 
       <table className="w-full text-sm">
         <tbody>
@@ -171,6 +121,7 @@ export function EngineCrossSection({ result }: { result: SimResult | undefined }
                       type="number"
                       defaultValue={Number(disp.toFixed(3))}
                       className="input w-24 text-right"
+                      min={isNonNegativeUnit(row.unit) ? 0 : undefined}
                       onBlur={(e) => commit(row, e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") commit(row, (e.target as HTMLInputElement).value);
@@ -307,12 +258,41 @@ export function LongitudinalSVG({
       fill="none" stroke="var(--dim-derived)" strokeWidth={1} strokeDasharray="5 4" />,
   );
 
+  // case wall (solid black band between the case OD and ID)
+  if (rCaseO > rCaseI + 0.01) {
+    const caseW = (nx - chamStartX) * scale;
+    els.push(
+      <rect key="case-wall-top" x={sx(chamStartX)} y={yUp(rCaseO)} width={caseW}
+        height={(rCaseO - rCaseI) * scale} fill="var(--case-color)" />,
+      <rect key="case-wall-bot" x={sx(chamStartX)} y={yDn(rCaseI)} width={caseW}
+        height={(rCaseO - rCaseI) * scale} fill="var(--case-color)" />,
+    );
+  }
+
   // bulkhead
   if (bh) {
     els.push(
       <rect key="bh" x={sx(bh.x_start_mm)} y={yUp(rCaseO)} width={(bh.x_end_mm - bh.x_start_mm) * scale}
-        height={rCaseO * 2 * scale} fill="var(--nozzle-metal)" stroke={caseStroke} strokeWidth={1.2} />,
+        height={rCaseO * 2 * scale} fill="var(--case-color)" stroke={caseStroke} strokeWidth={1.2} />,
     );
+  }
+
+  // liner — the band between the case bore and the grain OD (skipped where too thin to see)
+  const linerTmm = (design.liner?.thickness ?? 0) * 1000;
+  if (linerTmm > 0.01) {
+    const rLinerO = rCaseI;
+    const rLinerI = Math.max(rCaseI - linerTmm, rGrainO);
+    const lc = linerColor(design.liner?.material_id);
+    for (const sign of [-1, 1]) {
+      const yA = sign < 0 ? yUp(rLinerO) : yDn(rLinerI);
+      els.push(
+        <rect key={`liner-${sign}`} x={sx(gx0)} y={yA} width={(gx1 - gx0) * scale}
+          height={(rLinerO - rLinerI) * scale} fill={lc}
+          stroke={badPart("liner") ? "var(--error)" : "var(--nozzle-metal-stroke)"} strokeWidth={0.6}>
+          <title>{`${t("drawing.liner")} · ${design.liner?.material_id ?? ""}`}</title>
+        </rect>,
+      );
+    }
   }
 
   // propellant grain (green) with the burnt zone (grey) and the dark cavity
@@ -528,11 +508,11 @@ export function TransverseSVG({
     <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${S} ${S}`}
       className="mx-auto block max-h-[360px]" style={{ color: "var(--text)" }}>
       {/* case wall */}
-      {ring(rCaseO, "var(--nozzle-metal)", caseS, 1.3)}
+      {ring(rCaseO, "var(--case-color)", caseS, 1.3)}
       {ring(rCaseI, "var(--surface)", caseS)}
       {/* liner */}
       {linerT > 0 &&
-        ring(rLinerI, "var(--surface-2)", badPart("liner") ? "var(--error)" : "currentColor")}
+        ring(rLinerI, linerColor(design.liner?.material_id), badPart("liner") ? "var(--error)" : "currentColor")}
       {/* propellant (green) */}
       {ring(rGrainO, "var(--propellant)",
         badPart("grain") ? "var(--error)" : "var(--propellant-stroke)", badPart("grain") ? 1.8 : 1.2)}

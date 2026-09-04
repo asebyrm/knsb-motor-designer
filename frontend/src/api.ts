@@ -64,9 +64,11 @@ export const api = {
     ),
   exportUrl: BASE + "/export",
   async exportFile(design: DesignDoc, fmt: string, locale: string, acceptRisk: boolean) {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     const res = await fetch(BASE + "/export", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       credentials: "include",
       body: JSON.stringify({ design, fmt, locale, accept_risk: acceptRisk }),
     });
@@ -78,8 +80,12 @@ export const api = {
     const a = document.createElement("a");
     a.href = url;
     a.download = name;
+    // must be attached to the document for the click to reliably start a
+    // download in every browser; detach + revoke only after it has fired.
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   },
   register: (body: Record<string, unknown>) =>
     req<{ access_token: string; user: Record<string, unknown> }>("/auth/register", {
