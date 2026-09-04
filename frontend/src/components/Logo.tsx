@@ -26,8 +26,8 @@ export function Logo({
           dominantBaseline="central"
           fontFamily="var(--font-sans, system-ui)"
           fontWeight="800"
-          fontSize="34"
-          letterSpacing="1"
+          fontSize="27"
+          letterSpacing="0.5"
           fill="currentColor"
           stroke="none"
         >
