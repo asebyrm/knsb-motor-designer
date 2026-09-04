@@ -475,28 +475,10 @@ export function LongitudinalSVG({
   // through) so the solid-black case wall reads as a clean, unambiguous outline
   // instead of blending into an equally dark chamber interior.
   const rCav = rBoreNow || rT;
-  // throat -> exit and back, straight for "conic", curved for "bell" (matches the
-  // nozzle bell's own divInner/divOuter above)
-  const divFlowOut = (yy: (r: number) => number) =>
-    isBell
-      ? `C ${sx(pThroat + dLen * 0.3)} ${yy(rT)} ${sx(pExit - dLen * 0.15)} ${yy(rE)} ${sx(pExit)} ${yy(rE)} `
-      : `L ${sx(pExit)} ${yy(rE)} `;
-  const divFlowBack = (yy: (r: number) => number) =>
-    isBell
-      ? `C ${sx(pExit - dLen * 0.15)} ${yy(rE)} ${sx(pThroat + dLen * 0.3)} ${yy(rT)} ${sx(pThroat)} ${yy(rT)} `
-      : `L ${sx(pThroat)} ${yy(rT)} `;
-  els.push(
-    <path key="cavity"
-      d={`M ${sx(nx)} ${yUp(rCav)} ` +
-         `Q ${sx(nx + cLen * 0.35)} ${yUp(rCav)} ${sx(pConv)} ${yUp(rT)} ` +
-         `L ${sx(pThroat)} ${yUp(rT)} ` +
-         `${divFlowOut(yUp)}` +
-         `L ${sx(pExit)} ${yDn(rE)} ` +
-         `${divFlowBack(yDn)}` +
-         `L ${sx(pConv)} ${yDn(rT)} ` +
-         `Q ${sx(nx + cLen * 0.35)} ${yDn(rCav)} ${sx(nx)} ${yDn(rCav)} Z`}
-      fill="var(--cavity)" />,
-  );
+  // the nozzle wall path above already only fills the metal itself (outer profile
+  // down to the flow surface), so the flow passage is left unfilled here too, the
+  // same as the chamber - background shows through instead of a separate cavity
+  // fill, keeping the two visually consistent.
 
   // flame front (yellow) — the burning surfaces, drawn per segment so it stops at
   // each segment's actual (possibly burnt-through) extent rather than bridging gaps
@@ -772,50 +754,39 @@ export function NozzleTechnicalSVG({
   const isBell = nz.contour_type === "bell";
   const nozStroke = badPart("nozzle") ? "var(--error)" : "var(--nozzle-metal-stroke)";
 
-  const divOuter = isBell
-    ? `C ${sx(pThroat + divLen * 0.3)} ${yUp(rT + wallT)} ${sx(pExit - divLen * 0.15)} ${yUp(rE + wallE)} ` +
-      `${sx(pExit)} ${yUp(rE + wallE)} `
-    : `L ${sx(pExit)} ${yUp(rE + wallE)} `;
-  const divInner = isBell
-    ? `C ${sx(pExit - divLen * 0.15)} ${yDn(rE)} ${sx(pThroat + divLen * 0.3)} ${yDn(rT)} ${sx(pThroat)} ${yDn(rT)} `
-    : `L ${sx(pThroat)} ${yDn(rT)} `;
-  const bodyPath =
-    `M ${sx(0)} ${yUp(rChamber)} ` +
-    `L ${sx(pConv - convLen * 0.15)} ${yUp(rChamber * 0.97)} ` +
-    `Q ${sx(pConv - convLen * 0.15)} ${yUp(rT + wallT)} ${sx(pConv)} ${yUp(rT + wallT)} ` +
-    `L ${sx(pThroat)} ${yUp(rT + wallT)} ` +
-    `${divOuter}` +
-    `L ${sx(pExit)} ${yDn(rE + wallE)} ` +
-    (isBell
-      ? `C ${sx(pExit - divLen * 0.15)} ${yDn(rE + wallE)} ${sx(pThroat + divLen * 0.3)} ${yDn(rT + wallT)} ` +
-        `${sx(pThroat)} ${yDn(rT + wallT)} `
-      : `L ${sx(pThroat)} ${yDn(rT + wallT)} `) +
-    `L ${sx(pConv)} ${yDn(rT + wallT)} ` +
-    `Q ${sx(pConv - convLen * 0.15)} ${yDn(rT + wallT)} ${sx(pConv - convLen * 0.15)} ${yDn(rChamber * 0.97)} ` +
-    `L ${sx(0)} ${yDn(rChamber)} Z`;
-  const divFlowOut = isBell
-    ? `C ${sx(pThroat + divLen * 0.3)} ${yUp(rT)} ${sx(pExit - divLen * 0.15)} ${yUp(rE)} ${sx(pExit)} ${yUp(rE)} `
-    : `L ${sx(pExit)} ${yUp(rE)} `;
-  const cavityPath =
-    `M ${sx(0)} ${yUp(rChamber)} ` +
-    `L ${sx(pConv)} ${yUp(rT)} ` +
-    `L ${sx(pThroat)} ${yUp(rT)} ` +
-    `${divFlowOut}` +
-    `L ${sx(pExit)} ${yDn(rE)} ` +
-    `${divInner}` +
-    `L ${sx(pConv)} ${yDn(rT)} ` +
-    `L ${sx(0)} ${yDn(rChamber)} Z`;
-
+  // each half (top/bottom) is its own closed wedge tracing the outer profile out
+  // to the exit and the inner (flow) profile back - never a solid filled bell -
+  // so the flow passage is naturally unfilled (background shows through) instead
+  // of needing a separate cavity shape drawn over it
+  const divOuter = (yy: (r: number) => number) =>
+    isBell
+      ? `C ${sx(pThroat + divLen * 0.3)} ${yy(rT + wallT)} ${sx(pExit - divLen * 0.15)} ${yy(rE + wallE)} ` +
+        `${sx(pExit)} ${yy(rE + wallE)} `
+      : `L ${sx(pExit)} ${yy(rE + wallE)} `;
+  const divInner = (yy: (r: number) => number) =>
+    isBell
+      ? `C ${sx(pExit - divLen * 0.15)} ${yy(rE)} ${sx(pThroat + divLen * 0.3)} ${yy(rT)} ${sx(pThroat)} ${yy(rT)} `
+      : `L ${sx(pThroat)} ${yy(rT)} `;
+  const bell = (yy: (r: number) => number) =>
+    `M ${sx(0)} ${yy(rChamber)} ` +
+    `L ${sx(pConv - convLen * 0.15)} ${yy(rChamber * 0.97)} ` +
+    `Q ${sx(pConv - convLen * 0.15)} ${yy(rT + wallT)} ${sx(pConv)} ${yy(rT + wallT)} ` +
+    `L ${sx(pThroat)} ${yy(rT + wallT)} ` +
+    `${divOuter(yy)}` +
+    `L ${sx(pExit)} ${yy(rE)} ` +
+    `${divInner(yy)}` +
+    `L ${sx(pConv)} ${yy(rT)} ` +
+    `Q ${sx(pConv - convLen * 0.15)} ${yy(rChamber * 0.9)} ${sx(0)} ${yy(rChamber)} Z`;
   const material = nz.material_id ?? design.case.material_id;
 
   return (
     <div className="space-y-2">
       <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${W} ${H}`}
         className="min-w-[600px]" style={{ color: "var(--text)" }}>
-        <path d={bodyPath} fill="var(--case-color)" stroke={nozStroke} strokeWidth={1.4}>
+        <path d={bell(yUp)} fill="var(--case-color)" stroke={nozStroke} strokeWidth={1.4}>
           <title>{`${t("drawing.nozzle")} · ${material}`}</title>
         </path>
-        <path d={cavityPath} fill="var(--cavity)" />
+        <path d={bell(yDn)} fill="var(--case-color)" stroke={nozStroke} strokeWidth={1.4} />
         <line x1={sx(-20)} y1={axisY} x2={sx(pExit) + 40} y2={axisY} stroke="var(--axis)"
           strokeWidth={0.7} strokeDasharray="10 3 2 3" />
 
